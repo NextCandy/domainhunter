@@ -196,7 +196,7 @@ export const upsertCouponFn = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ context, data }) => {
     await assertAdmin(context.supabase, context.userId);
-    const payload = { ...data, tlds: data.tlds?.map(normTld) ?? null };
+    const payload = { ...data, tlds: data.tlds?.map(normTld) };
     const { error } = data.id
       ? await sb().from("coupons").update(payload).eq("id", data.id)
       : await sb().from("coupons").insert(payload);
