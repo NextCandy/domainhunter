@@ -137,18 +137,18 @@ export function FilterPanel({
       <Section title={`后缀${filters.tlds?.length ? ` · 已选 ${filters.tlds.length}` : ""}`}>
         {/* 批量快捷操作 */}
         <div className="mb-2 flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...COMMON_TLDS])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), ...COMMON_TLDS])}
             className="rounded-md border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/10">全选</button>
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["com","net","org","io","ai","co","app","dev","xyz"]])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "com","net","org","io","ai","co","app","dev","xyz"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 热门 gTLD</button>
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["cn","com.cn","net.cn","hk","tw","jp","kr","sg"]])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "cn","com.cn","net.cn","hk","tw","jp","kr","sg"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 亚洲 ccTLD</button>
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["de","uk","co.uk","fr","it","es","nl","ch","se","no","fi","dk","pl","be","at","ie"]])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "de","uk","co.uk","fr","it","es","nl","ch","se","no","fi","dk","pl","be","at","ie"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 欧洲 ccTLD</button>
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["to","is","im","li","la","fm","gg","so","ws","cc","tv","me"]])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "to","is","im","li","la","fm","gg","so","ws","cc","tv","me"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 极客短</button>
           {(filters.tlds?.length ?? 0) > 0 && (
-            <button type="button" onClick={() => set("tlds", undefined)}
+            <button type="button" onClick={() => setTlds(undefined)}
               className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground">清空</button>
           )}
         </div>
