@@ -14,7 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      job_items: {
+        Row: {
+          checked_at: string | null
+          domain: string
+          error: string | null
+          id: number
+          info: Json | null
+          job_id: string
+          status: string
+          tld: string
+        }
+        Insert: {
+          checked_at?: string | null
+          domain: string
+          error?: string | null
+          id?: number
+          info?: Json | null
+          job_id: string
+          status?: string
+          tld: string
+        }
+        Update: {
+          checked_at?: string | null
+          domain?: string
+          error?: string | null
+          id?: number
+          info?: Json | null
+          job_id?: string
+          status?: string
+          tld?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          available: number
+          checked: number
+          created_at: string
+          errors: number
+          finished_at: string | null
+          id: string
+          last_progress_at: string | null
+          name: string
+          params: Json
+          registered: number
+          started_at: string | null
+          status: string
+          total: number
+          unsupported: number
+        }
+        Insert: {
+          available?: number
+          checked?: number
+          created_at?: string
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          last_progress_at?: string | null
+          name: string
+          params?: Json
+          registered?: number
+          started_at?: string | null
+          status?: string
+          total?: number
+          unsupported?: number
+        }
+        Update: {
+          available?: number
+          checked?: number
+          created_at?: string
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          last_progress_at?: string | null
+          name?: string
+          params?: Json
+          registered?: number
+          started_at?: string | null
+          status?: string
+          total?: number
+          unsupported?: number
+        }
+        Relationships: []
+      }
+      tlds_cache: {
+        Row: {
+          data: Json
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          data: Json
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          data?: Json
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
