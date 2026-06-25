@@ -32,6 +32,11 @@ function DomainDetailPage() {
     mutationFn: () => toggleWatchFn({ data: { domain } }),
     onSuccess: r => { toast.success(r.watching ? "已加入观察列表" : "已从观察移除"); refetch(); },
   });
+  const enrichMut = useMutation({
+    mutationFn: () => enrichDomainFn({ data: { domain } }),
+    onSuccess: r => { toast.success(`已抓取 DNS · A=${r.dns.a_records.length} NS=${r.dns.ns_records.length}${r.archive.archive_year ? ` · Archive ${r.archive.archive_year}` : ""}`); refetch(); },
+    onError: (e: any) => toast.error(e?.message ?? "抓取失败"),
+  });
 
   if (isLoading) return <AppShell><div className="card-elev p-10 text-center text-sm text-muted-foreground">加载中…</div></AppShell>;
 
