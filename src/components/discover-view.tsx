@@ -181,6 +181,8 @@ export function DiscoverView({
         });
         if (res?.remaining === 0 || res?.processed === 0 || job.status === "completed" || job.status === "stopped") {
           setProgress((prev) => prev && { ...prev, status: job.status === "stopped" ? "stopped" : "completed" });
+          // 清掉状态预设，让实时扫描得到的 available/registered 都能在列表里显示
+          setFilters((f) => ({ ...f, statuses: undefined, page: 1 }));
           refetch();
           break;
         }
