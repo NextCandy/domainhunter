@@ -96,9 +96,9 @@ export function FilterPanel({
     set("tlds", dedup.length ? dedup : undefined);
   };
 
-  const visibleTlds = (tldExpanded ? COMMON_TLDS : COMMON_TLDS.slice(0, 18))
+  const visibleTlds = (tldExpanded ? tldList : tldList.slice(0, 18))
     .filter(t => !tldQuery || t.includes(tldQuery.toLowerCase()));
-  const selectedExtra = (filters.tlds ?? []).filter(t => !COMMON_TLDS.includes(t));
+  const selectedExtra = (filters.tlds ?? []).filter(t => !tldList.includes(t));
 
   const addCustom = () => {
     const parts = customTld.split(/[\s,，\n]+/).map(s => s.trim().replace(/^\./, "")).filter(Boolean);
