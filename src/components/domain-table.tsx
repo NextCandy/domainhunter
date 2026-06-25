@@ -191,8 +191,14 @@ export function FilterPanel({
             <button type="button" onClick={addCustom}
               className="btn-base btn-ghost !py-1 text-xs">加入</button>
           </div>
-          <div className="text-[11px] text-muted-foreground">支持逗号/空格/换行分隔的批量后缀</div>
+          <div className="text-[11px] text-muted-foreground">支持逗号/空格/换行分隔的批量后缀，已自动去重</div>
         </div>
+        {onSearch && (
+          <button type="button" onClick={runBatchSearch}
+            className="btn-base btn-primary mt-3 w-full">
+            批量查询{filters.tlds?.length ? `（${filters.tlds.length} 个 TLD）` : ""}
+          </button>
+        )}
       </Section>
 
       <Section title="状态">
