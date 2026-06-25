@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Copy, Sparkles, Search, Bookmark, Trash2, Loader2 } from "lucide-react";
+import { Copy, Sparkles, Search, Bookmark, Trash2, Loader2, DollarSign } from "lucide-react";
 import { AppShell, PageHeader, EmptyState } from "@/components/app-shell";
 import { generateIdeasFn, listIdeasFn, deleteIdeaFn } from "@/lib/ideas.functions";
 import { toggleWatchFn } from "@/lib/discover.functions";
@@ -64,10 +64,15 @@ function IdeasPage() {
   function check(d: string) {
     nav({ to: "/discover", search: { q: d.split(".")[0] } as never }).catch(() => nav({ to: "/discover" }));
   }
+  function comparePrice(d: string) {
+    const tld = d.split(".").slice(1).join(".");
+    nav({ to: "/pricing", search: { tld, domain: d } as never }).catch(() => nav({ to: "/pricing" }));
+  }
   async function watch(d: string) {
     try { await toggle({ data: { domain: d } }); toast.success(`已加入观察列表：${d}`); }
     catch (e) { toast.error("加入失败：" + (e as Error).message); }
   }
+
 
   return (
     <AppShell>

@@ -64,12 +64,28 @@ function AdminPricing() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["coupons-admin"] }),
   });
 
+  const syncMut = useMutation({
+    mutationFn: () => syncRegistrarPricesFn({ data: {} }),
+    onSuccess: (r: any) => {
+      toast.success(`同步完成：新增 ${r.totalInserted} · 更新 ${r.totalUpdated}`);
+      qc.invalidateQueries({ queryKey: ["prices"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "同步失败"),
+  });
+
   return (
     <div className="space-y-5">
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <button onClick={() => setTab("prices")} className={`rounded-md px-3 py-1.5 text-sm ${tab === "prices" ? "bg-primary text-primary-foreground" : "bg-surface ring-1 ring-border"}`}>价格表</button>
         <button onClick={() => setTab("coupons")} className={`rounded-md px-3 py-1.5 text-sm ${tab === "coupons" ? "bg-primary text-primary-foreground" : "bg-surface ring-1 ring-border"}`}>优惠码</button>
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={() => syncMut.mutate()} disabled={syncMut.isPending} className="btn-base btn-primary text-xs">
+            {syncMut.isPending ? "同步中…" : "立即同步注册商 API"}
+          </button>
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground">提示：在注册商管理中给启用的注册商配置 <code>config_json.prices_url</code>（可选 <code>auth_header</code>/<code>auth_value</code>），定时任务每小时自动同步。</p>
+
 
       {tab === "prices" && (
         <div className="grid gap-5 lg:grid-cols-[1fr_1.6fr]">
