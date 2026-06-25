@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WatchlistRouteImport } from './routes/watchlist'
 import { Route as PendingRouteImport } from './routes/pending'
+import { Route as MyDomainsRouteImport } from './routes/my-domains'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DeletedRouteImport } from './routes/deleted'
 import { Route as AuctionsRouteImport } from './routes/auctions'
@@ -26,6 +27,11 @@ const WatchlistRoute = WatchlistRouteImport.update({
 const PendingRoute = PendingRouteImport.update({
   id: '/pending',
   path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyDomainsRoute = MyDomainsRouteImport.update({
+  id: '/my-domains',
+  path: '/my-domains',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DiscoverRoute = DiscoverRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/auctions'
     | '/deleted'
     | '/discover'
+    | '/my-domains'
     | '/pending'
     | '/watchlist'
     | '/tools/batch-rdap'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/auctions'
     | '/deleted'
     | '/discover'
+    | '/my-domains'
     | '/pending'
     | '/watchlist'
     | '/tools/batch-rdap'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/auctions'
     | '/deleted'
     | '/discover'
+    | '/my-domains'
     | '/pending'
     | '/watchlist'
     | '/tools/batch-rdap'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   AuctionsRoute: typeof AuctionsRoute
   DeletedRoute: typeof DeletedRoute
   DiscoverRoute: typeof DiscoverRoute
+  MyDomainsRoute: typeof MyDomainsRoute
   PendingRoute: typeof PendingRoute
   WatchlistRoute: typeof WatchlistRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
@@ -149,6 +162,13 @@ declare module '@tanstack/react-router' {
       path: '/pending'
       fullPath: '/pending'
       preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-domains': {
+      id: '/my-domains'
+      path: '/my-domains'
+      fullPath: '/my-domains'
+      preLoaderRoute: typeof MyDomainsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/discover': {
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuctionsRoute: AuctionsRoute,
   DeletedRoute: DeletedRoute,
   DiscoverRoute: DiscoverRoute,
+  MyDomainsRoute: MyDomainsRoute,
   PendingRoute: PendingRoute,
   WatchlistRoute: WatchlistRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
