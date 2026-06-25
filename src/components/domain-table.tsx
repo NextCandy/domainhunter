@@ -26,7 +26,22 @@ export type DomainRow = {
   } | null;
 };
 
-const COMMON_TLDS = ["com", "net", "org", "io", "ai", "co", "cc", "cn", "xyz", "app"];
+const COMMON_TLDS = [
+  // gTLD 热门
+  "com", "net", "org", "info", "biz", "pro", "name", "mobi",
+  // 新 gTLD 热门
+  "io", "ai", "co", "app", "dev", "xyz", "site", "online", "store", "shop",
+  "tech", "cloud", "club", "fun", "icu", "live", "world", "today", "blog",
+  "design", "studio", "agency", "media", "news", "art", "vip", "top",
+  "wiki", "link", "page", "space", "website",
+  // ccTLD 常见
+  "cn", "com.cn", "net.cn", "cc", "tv", "me", "us", "uk", "co.uk",
+  "de", "jp", "co.jp", "kr", "tw", "hk", "sg", "in", "ru", "br",
+  "fr", "it", "es", "nl", "ca", "au", "com.au", "nz", "ch", "se",
+  "no", "fi", "dk", "pl", "be", "at", "cz", "ie", "mx", "ar",
+  // 极客 / 短
+  "to", "is", "im", "li", "la", "fm", "gg", "so", "ws",
+];
 const STATUSES = [
   { v: "available", label: "可注册" },
   { v: "registered", label: "已注册" },
@@ -48,11 +63,16 @@ const RISKS = [
 ];
 
 export function FilterPanel({
-  filters, onChange,
+  filters, onChange, onSearch,
 }: {
   filters: DiscoverFilters;
   onChange: (next: DiscoverFilters) => void;
+  onSearch?: () => void;
 }) {
+  const [tldExpanded, setTldExpanded] = useState(false);
+  const [tldQuery, setTldQuery] = useState("");
+  const [customTld, setCustomTld] = useState("");
+
   const toggle = <K extends keyof DiscoverFilters>(key: K, value: string) => {
     const current = (filters[key] as string[] | undefined) ?? [];
     const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
@@ -61,20 +81,31 @@ export function FilterPanel({
   const set = <K extends keyof DiscoverFilters>(key: K, value: DiscoverFilters[K]) =>
     onChange({ ...filters, [key]: value, page: 1 });
 
+  const visibleTlds = (tldExpanded ? COMMON_TLDS : COMMON_TLDS.slice(0, 18))
+    .filter(t => !tldQuery || t.includes(tldQuery.toLowerCase()));
+  const selectedExtra = (filters.tlds ?? []).filter(t => !COMMON_TLDS.includes(t));
+
   return (
     <div className="space-y-5 text-sm">
       <Section title="关键词">
         <input
           value={filters.q ?? ""}
           onChange={e => set("q", e.target.value || undefined)}
+          onKeyDown={e => { if (e.key === "Enter" && onSearch) onSearch(); }}
           placeholder="域名 / 子串"
           className="field"
         />
       </Section>
 
-      <Section title="后缀">
+      <Section title={`后缀${filters.tlds?.length ? ` · 已选 ${filters.tlds.length}` : ""}`}>
+        <input
+          value={tldQuery}
+          onChange={e => setTldQuery(e.target.value)}
+          placeholder="搜索后缀，例如 com / cn"
+          className="field mb-2"
+        />
         <div className="flex flex-wrap gap-1.5">
-          {COMMON_TLDS.map(t => {
+          {visibleTlds.map(t => {
             const on = filters.tlds?.includes(t);
             return (
               <button key={t} onClick={() => toggle("tlds", t)} type="button"
@@ -83,6 +114,32 @@ export function FilterPanel({
                 }`}>.{t}</button>
             );
           })}
+          {selectedExtra.map(t => (
+            <button key={t} onClick={() => toggle("tlds", t)} type="button"
+              className="rounded-md border border-primary bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">.{t} ×</button>
+          ))}
+        </div>
+        {COMMON_TLDS.length > 18 && !tldQuery && (
+          <button type="button" onClick={() => setTldExpanded(v => !v)}
+            className="mt-2 text-xs text-primary hover:underline">
+            {tldExpanded ? "收起" : `展开全部 ${COMMON_TLDS.length} 个后缀 →`}
+          </button>
+        )}
+        <div className="mt-2 flex gap-1.5">
+          <input
+            value={customTld}
+            onChange={e => setCustomTld(e.target.value.toLowerCase().replace(/[^a-z0-9.]/g, ""))}
+            placeholder="自定义后缀"
+            className="field flex-1 text-xs"
+          />
+          <button type="button"
+            onClick={() => {
+              const v = customTld.trim().replace(/^\./, "");
+              if (!v) return;
+              if (!filters.tlds?.includes(v)) toggle("tlds", v);
+              setCustomTld("");
+            }}
+            className="btn-base btn-ghost !py-1 text-xs">加入</button>
         </div>
       </Section>
 
@@ -158,8 +215,14 @@ export function FilterPanel({
         </div>
       </Section>
 
-      <button type="button" onClick={() => onChange({ page: 1, pageSize: filters.pageSize, sortBy: "score", sortDir: "desc" })}
-        className="btn-base btn-ghost w-full">清空筛选</button>
+      <div className="flex gap-2">
+        {onSearch && (
+          <button type="button" onClick={onSearch}
+            className="btn-base btn-primary flex-1">查询</button>
+        )}
+        <button type="button" onClick={() => onChange({ page: 1, pageSize: filters.pageSize, sortBy: "score", sortDir: "desc" })}
+          className="btn-base btn-ghost flex-1">清空</button>
+      </div>
     </div>
   );
 }
