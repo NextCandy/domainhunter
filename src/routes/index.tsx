@@ -944,6 +944,9 @@ function CurrentTask() {
         />
       </div>
 
+      <AuditLogPanel jobId={job.id} />
+
+
       {recentJobs.length > 1 && (
         <section className="panel p-5 sm:p-6">
           <SectionTitle title="切换任务" />
