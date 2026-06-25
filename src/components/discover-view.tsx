@@ -411,19 +411,37 @@ function ProgressModal({
   const speed = (p.done / elapsed).toFixed(1);
   const dl = (kind: string) => `/api/public/jobs/${p.jobId}/download?kind=${kind}`;
   const finished = p.status === "completed" || p.status === "stopped" || p.status === "error";
+  const success = p.available + p.registered;
+  const skipped = Math.max(0, p.total - p.done);
 
   // tick to refresh elapsed/speed
   const [, force] = useState(0);
   useEffect(() => { const t = setInterval(() => force(n => n + 1), 1000); return () => clearInterval(t); }, []);
 
+  // 扫描结束后拉取错误明细并按原因分组
+  const { data: errAll } = useQuery({
+    queryKey: ["job-errors-all", p.jobId, finished],
+    queryFn: () => recentItemsFn({ data: { jobId: p.jobId, kind: "error", limit: 500 } }),
+    enabled: finished && p.errors > 0,
+    staleTime: 30_000,
+  });
+  const errorGroups = (() => {
+    const map = new Map<string, number>();
+    for (const it of errAll ?? []) {
+      const key = normalizeErr(it.error ?? "未知错误");
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  })();
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
       <div className="absolute inset-0 bg-black/40" />
-      <div className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-2xl">
+      <div className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-base font-semibold flex items-center gap-2">
             <Zap className="h-4 w-4 text-primary" />
-            RDAP 实时扫描
+            {finished ? "扫描摘要" : "RDAP 实时扫描"}
             <span className={`ml-1 rounded px-1.5 py-0.5 text-xs ${
               finished ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-primary/15 text-primary"
             }`}>{p.status}</span>
@@ -444,7 +462,35 @@ function ProgressModal({
           剩余 {remaining} · 已用 {elapsed}s · 速率 ~{speed}/s · 进度 {pct}%
         </div>
 
-        {p.errorSamples.length > 0 && (
+        {finished && (
+          <div className="mb-3 rounded border border-border bg-background/40 p-3 text-xs">
+            <div className="mb-2 grid grid-cols-4 gap-2 text-center">
+              <Stat label="成功" value={success} accent="emerald" />
+              <Stat label="失败" value={p.errors} accent="rose" />
+              <Stat label="跳过" value={skipped} accent="amber" />
+              <Stat label="耗时" value={`${elapsed}s`} />
+            </div>
+            {errorGroups.length > 0 ? (
+              <div>
+                <div className="mb-1 font-semibold text-foreground">失败原因分组</div>
+                <ul className="space-y-0.5 font-mono">
+                  {errorGroups.map(([reason, n]) => (
+                    <li key={reason} className="flex justify-between gap-2">
+                      <span className="truncate text-rose-600">{reason}</span>
+                      <span className="shrink-0 text-muted-foreground">×{n}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : p.errors === 0 ? (
+              <div className="text-muted-foreground">本次扫描无失败 🎉</div>
+            ) : (
+              <div className="text-muted-foreground">正在加载失败原因…</div>
+            )}
+          </div>
+        )}
+
+        {!finished && p.errorSamples.length > 0 && (
           <div className="mb-3 max-h-40 overflow-y-auto rounded border border-border bg-background/50 p-2 text-xs font-mono">
             <div className="mb-1 text-muted-foreground">最近失败 ({p.errors})</div>
             {p.errorSamples.map((e, i) => (
@@ -464,12 +510,24 @@ function ProgressModal({
             </button>
           )}
           <button onClick={onSkip} className="btn-base btn-ghost text-xs ml-auto">
-            <SkipForward className="h-3.5 w-3.5" />跳过/关闭
+            <SkipForward className="h-3.5 w-3.5" />{finished ? "关闭并查看结果" : "跳过/关闭"}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function normalizeErr(raw: string): string {
+  const s = raw.toLowerCase();
+  if (/429|rate.?limit|too many/.test(s)) return "限流 (429 / rate limit)";
+  if (/timeout|timed.?out|etimedout/.test(s)) return "请求超时";
+  if (/network|fetch failed|enotfound|econnreset|socket/.test(s)) return "网络错误";
+  if (/404|not.?found/.test(s)) return "RDAP 未找到 (404)";
+  if (/5\d\d/.test(s)) return "服务器错误 (5xx)";
+  if (/unsupported|no rdap/.test(s)) return "TLD 不支持 RDAP";
+  if (/invalid|parse/.test(s)) return "解析/格式错误";
+  return raw.length > 60 ? raw.slice(0, 60) + "…" : raw;
 }
 
 function Stat({ label, value, accent }: { label: string; value: number | string; accent?: "emerald" | "amber" | "rose" }) {
