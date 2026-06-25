@@ -573,33 +573,38 @@ function NewTask() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="总 QPS" value={qps} setValue={setQps} hint="默认 5" />
-            <NumField label="并发数" value={concurrency} setValue={setConcurrency} hint="默认 20" />
-            <NumField label="单主机 QPS" value={perHostQps} setValue={setPerHostQps} hint="默认 10" />
-            <NumField label="测试 limit" value={limit} setValue={setLimit} hint="0=全量" />
+            <NumField label="总 QPS" value={qps} setValue={setQps} bounds={LIMITS.qps} />
+            <NumField label="并发数" value={concurrency} setValue={setConcurrency} bounds={LIMITS.concurrency} />
+            <NumField label="单主机 QPS" value={perHostQps} setValue={setPerHostQps} bounds={LIMITS.perHostQps} />
+            <NumField label="测试 limit" value={limit} setValue={setLimit} bounds={LIMITS.limit} hint="0=全量" />
             <NumField
               label="安全上限 max_total"
               value={maxTotal}
               setValue={setMaxTotal}
+              bounds={LIMITS.maxTotal}
               hint="0=不限制"
             />
             <div className="grid grid-cols-2 gap-2">
-              <NumField label="超时(秒)" value={timeout} setValue={setTimeout} hint="默认 30" />
-              <NumField label="重试" value={retries} setValue={setRetries} hint="默认 2" />
+              <NumField label="超时(秒)" value={timeout} setValue={setTimeout} bounds={LIMITS.timeoutSec} />
+              <NumField label="重试" value={retries} setValue={setRetries} bounds={LIMITS.retries} />
             </div>
           </div>
         </div>
       </div>
 
       <div className="mt-5 pt-5 border-t border-border flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs">
           {estimate && (
-            <span className="mono">
+            <span className="mono text-muted-foreground">
               估算 ≈ <span className="text-foreground">{estimate.total.toLocaleString()}</span> 个域名
               {estimate.capped ? " (估算)" : ""}
             </span>
           )}
-          {error && <span className="text-destructive ml-3">{error}</span>}
+          {error && (
+            <div className="mt-1.5 text-destructive border border-destructive/40 bg-destructive/10 rounded px-2 py-1 inline-block">
+              ⚠ {error}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={doEstimate} className="btn-base btn-ghost" type="button">
