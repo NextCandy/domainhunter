@@ -143,7 +143,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
       reg = 0,
       unsup = 0,
       err = 0;
-    const updates: Promise<unknown>[] = [];
+    const updates: PromiseLike<unknown>[] = [];
     for (let i = 0; i < pendingItems.length; i++) {
       const it = pendingItems[i];
       const r = results[i];
@@ -164,17 +164,17 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         errMsg = String(r.reason?.message || r.reason || "error");
         info = { error: errMsg };
       }
-      updates.push(
-        supabaseAdmin
-          .from("job_items")
-          .update({
-            status,
-            info,
-            error: errMsg,
-            checked_at: new Date().toISOString(),
-          })
-          .eq("id", it.id),
-      );
+      const p = supabaseAdmin
+        .from("job_items")
+        .update({
+          status,
+          info,
+          error: errMsg,
+          checked_at: new Date().toISOString(),
+        })
+        .eq("id", it.id)
+        .then((x) => x);
+      updates.push(p);
     }
     await Promise.allSettled(updates);
 
