@@ -17,6 +17,7 @@ import { Route as DeletedRouteImport } from './routes/deleted'
 import { Route as AuctionsRouteImport } from './routes/auctions'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
+import { Route as DomainsDomainRouteImport } from './routes/domains.$domain'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
 
 const WatchlistRoute = WatchlistRouteImport.update({
@@ -59,6 +60,11 @@ const ToolsBatchRdapRoute = ToolsBatchRdapRouteImport.update({
   path: '/tools/batch-rdap',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DomainsDomainRoute = DomainsDomainRouteImport.update({
+  id: '/domains/$domain',
+  path: '/domains/$domain',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicJobsJobIdDownloadRoute =
   ApiPublicJobsJobIdDownloadRouteImport.update({
     id: '/api/public/jobs/$jobId/download',
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
+  '/domains/$domain': typeof DomainsDomainRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
+  '/domains/$domain': typeof DomainsDomainRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
+  '/domains/$domain': typeof DomainsDomainRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/my-domains'
     | '/pending'
     | '/watchlist'
+    | '/domains/$domain'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
   fileRoutesByTo: FileRoutesByTo
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/my-domains'
     | '/pending'
     | '/watchlist'
+    | '/domains/$domain'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
   id:
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '/my-domains'
     | '/pending'
     | '/watchlist'
+    | '/domains/$domain'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
   fileRoutesById: FileRoutesById
@@ -144,6 +156,7 @@ export interface RootRouteChildren {
   MyDomainsRoute: typeof MyDomainsRoute
   PendingRoute: typeof PendingRoute
   WatchlistRoute: typeof WatchlistRoute
+  DomainsDomainRoute: typeof DomainsDomainRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
   ApiPublicJobsJobIdDownloadRoute: typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -206,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ToolsBatchRdapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/domains/$domain': {
+      id: '/domains/$domain'
+      path: '/domains/$domain'
+      fullPath: '/domains/$domain'
+      preLoaderRoute: typeof DomainsDomainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/jobs/$jobId/download': {
       id: '/api/public/jobs/$jobId/download'
       path: '/api/public/jobs/$jobId/download'
@@ -224,6 +244,7 @@ const rootRouteChildren: RootRouteChildren = {
   MyDomainsRoute: MyDomainsRoute,
   PendingRoute: PendingRoute,
   WatchlistRoute: WatchlistRoute,
+  DomainsDomainRoute: DomainsDomainRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
   ApiPublicJobsJobIdDownloadRoute: ApiPublicJobsJobIdDownloadRoute,
 }
