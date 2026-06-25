@@ -633,22 +633,48 @@ function NumField({
   value,
   setValue,
   hint,
+  bounds,
 }: {
   label: string;
   value: number;
   setValue: (v: number) => void;
   hint?: string;
+  bounds?: { readonly min: number; readonly max: number };
 }) {
+  const oob =
+    bounds != null && (value < bounds.min || value > bounds.max);
   return (
     <label className="block">
-      <div className="text-[11px] text-muted-foreground mb-1">{label}</div>
+      <div className="text-[11px] text-muted-foreground mb-1 flex items-baseline justify-between gap-2">
+        <span>{label}</span>
+        {bounds && (
+          <span className="mono text-[10px] text-muted-foreground/70">
+            {bounds.min}–{bounds.max.toLocaleString()}
+          </span>
+        )}
+      </div>
       <input
         className="field"
         type="number"
+        min={bounds?.min}
+        max={bounds?.max}
         value={value}
         onChange={(e) => setValue(Number(e.target.value) || 0)}
+        onBlur={(e) => {
+          if (!bounds) return;
+          const n = Number(e.target.value) || 0;
+          const clamped = Math.min(bounds.max, Math.max(bounds.min, n));
+          if (clamped !== n) setValue(clamped);
+        }}
+        style={oob ? { borderColor: "var(--destructive)" } : undefined}
       />
-      {hint && <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>}
+      {oob && bounds ? (
+        <div className="text-[10px] text-destructive mt-0.5">
+          需在 {bounds.min}–{bounds.max.toLocaleString()} 之间
+        </div>
+      ) : hint ? (
+        <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>
+      ) : null}
     </label>
   );
 }
