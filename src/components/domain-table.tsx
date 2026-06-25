@@ -81,6 +81,16 @@ export function FilterPanel({
   const set = <K extends keyof DiscoverFilters>(key: K, value: DiscoverFilters[K]) =>
     onChange({ ...filters, [key]: value, page: 1 });
 
+  // 统一去重 + 规范化 TLD 列表
+  const setTlds = (list: string[] | undefined) => {
+    if (!list || !list.length) { set("tlds", undefined); return; }
+    const norm = list
+      .map(t => t.trim().toLowerCase().replace(/^\./, ""))
+      .filter(t => /^[a-z0-9.\-]+$/.test(t));
+    const dedup = Array.from(new Set(norm));
+    set("tlds", dedup.length ? dedup : undefined);
+  };
+
   const visibleTlds = (tldExpanded ? COMMON_TLDS : COMMON_TLDS.slice(0, 18))
     .filter(t => !tldQuery || t.includes(tldQuery.toLowerCase()));
   const selectedExtra = (filters.tlds ?? []).filter(t => !COMMON_TLDS.includes(t));
@@ -88,9 +98,28 @@ export function FilterPanel({
   const addCustom = () => {
     const parts = customTld.split(/[\s,，\n]+/).map(s => s.trim().replace(/^\./, "")).filter(Boolean);
     if (!parts.length) return;
-    const merged = Array.from(new Set([...(filters.tlds ?? []), ...parts]));
-    set("tlds", merged);
+    const before = filters.tlds?.length ?? 0;
+    setTlds([...(filters.tlds ?? []), ...parts]);
+    const added = parts.filter(p => !(filters.tlds ?? []).includes(p.toLowerCase())).length;
+    const dup = parts.length - added;
+    if (typeof window !== "undefined") {
+      import("sonner").then(({ toast }) => {
+        toast.success(`已加入 ${added} 个后缀${dup ? `，去重 ${dup} 个` : ""}（共 ${before + added}）`);
+      });
+    }
     setCustomTld("");
+  };
+
+  const runBatchSearch = () => {
+    const n = filters.tlds?.length ?? 0;
+    if (!n) {
+      import("sonner").then(({ toast }) => toast.error("请先选择至少 1 个后缀"));
+      return;
+    }
+    const ok = typeof window === "undefined"
+      ? true
+      : window.confirm(`将按 ${n} 个 TLD 进行批量查询。\n预计返回最多 ${filters.pageSize ?? 50} 条/页（数据库现有匹配记录）。\n确定开始？`);
+    if (ok && onSearch) onSearch();
   };
 
   return (
@@ -108,18 +137,18 @@ export function FilterPanel({
       <Section title={`后缀${filters.tlds?.length ? ` · 已选 ${filters.tlds.length}` : ""}`}>
         {/* 批量快捷操作 */}
         <div className="mb-2 flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...COMMON_TLDS])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), ...COMMON_TLDS])}
             className="rounded-md border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/10">全选</button>
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["com","net","org","io","ai","co","app","dev","xyz"]])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "com","net","org","io","ai","co","app","dev","xyz"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 热门 gTLD</button>
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["cn","com.cn","net.cn","hk","tw","jp","kr","sg"]])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "cn","com.cn","net.cn","hk","tw","jp","kr","sg"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 亚洲 ccTLD</button>
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["de","uk","co.uk","fr","it","es","nl","ch","se","no","fi","dk","pl","be","at","ie"]])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "de","uk","co.uk","fr","it","es","nl","ch","se","no","fi","dk","pl","be","at","ie"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 欧洲 ccTLD</button>
-          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["to","is","im","li","la","fm","gg","so","ws","cc","tv","me"]])))}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "to","is","im","li","la","fm","gg","so","ws","cc","tv","me"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 极客短</button>
           {(filters.tlds?.length ?? 0) > 0 && (
-            <button type="button" onClick={() => set("tlds", undefined)}
+            <button type="button" onClick={() => setTlds(undefined)}
               className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground">清空</button>
           )}
         </div>
@@ -162,8 +191,14 @@ export function FilterPanel({
             <button type="button" onClick={addCustom}
               className="btn-base btn-ghost !py-1 text-xs">加入</button>
           </div>
-          <div className="text-[11px] text-muted-foreground">支持逗号/空格/换行分隔的批量后缀</div>
+          <div className="text-[11px] text-muted-foreground">支持逗号/空格/换行分隔的批量后缀，已自动去重</div>
         </div>
+        {onSearch && (
+          <button type="button" onClick={runBatchSearch}
+            className="btn-base btn-primary mt-3 w-full">
+            批量查询{filters.tlds?.length ? `（${filters.tlds.length} 个 TLD）` : ""}
+          </button>
+        )}
       </Section>
 
       <Section title="状态">
