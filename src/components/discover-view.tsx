@@ -149,7 +149,9 @@ export function DiscoverView({
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="card-elev hidden h-fit p-4 lg:block">
-          <FilterPanel filters={filters} onChange={setFilters} onSearch={() => refetch()} />
+          <FilterPanel filters={filters} onChange={setFilters} onSearch={() => refetch()}
+            onBatchScan={() => liveScan.mutate()} batchScanning={liveScan.isPending} />
+
         </aside>
 
         <div className="min-w-0">
