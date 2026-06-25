@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { DiscoverView } from "@/components/discover-view";
 
 export const Route = createFileRoute("/deleted")({
-  component: () => {
-    useEffect(() => { window.location.replace("/discover?status=deleted"); }, []);
-    return <div className="p-10 text-center text-sm text-muted-foreground">跳转到发现页…</div>;
-  },
+  component: () => (
+    <DiscoverView
+      title="已删除域名"
+      presetStatuses={["deleted", "available"]}
+    />
+  ),
 });
