@@ -100,6 +100,13 @@ export function DiscoverView({
     placeholderData: (prev) => prev,
   });
 
+  // 后台可配置的 TLD 列表
+  const { data: tldData } = useQuery({
+    queryKey: ["tld-list"],
+    queryFn: () => getTldListFn(),
+    staleTime: 60_000,
+  });
+
   const watchMut = useMutation({
     mutationFn: (d: DomainRow) => toggleWatchFn({ data: { domain: d.domain } }),
     onSuccess: (r) => toast.success(r.watching ? "已加入观察列表" : "已从观察列表移除"),
