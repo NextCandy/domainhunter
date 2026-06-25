@@ -3,8 +3,14 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 
-const VALID_KINDS = ["available", "all", "errors", "events", "error-report"] as const;
+const VALID_KINDS = ["available", "all", "errors", "events", "error-report", "csv"] as const;
 type Kind = (typeof VALID_KINDS)[number];
+
+function csvEscape(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 
 export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
   server: {
