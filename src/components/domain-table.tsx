@@ -63,15 +63,18 @@ const RISKS = [
 ];
 
 export function FilterPanel({
-  filters, onChange, onSearch,
+  filters, onChange, onSearch, onBatchScan, batchScanning,
 }: {
   filters: DiscoverFilters;
   onChange: (next: DiscoverFilters) => void;
   onSearch?: () => void;
+  onBatchScan?: () => void;
+  batchScanning?: boolean;
 }) {
   const [tldExpanded, setTldExpanded] = useState(false);
   const [tldQuery, setTldQuery] = useState("");
   const [customTld, setCustomTld] = useState("");
+
 
   const toggle = <K extends keyof DiscoverFilters>(key: K, value: string) => {
     const current = (filters[key] as string[] | undefined) ?? [];
