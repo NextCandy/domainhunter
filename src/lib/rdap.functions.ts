@@ -272,6 +272,46 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
     }
     await Promise.allSettled(updatesArr);
 
+    // ── Mirror results into the `domains` table so the Discover view can show them ──
+    try {
+      const { parseDomain } = await import("./discover.functions");
+      const { scoreDomain, classifyDomain, DEFAULT_WEIGHTS } = await import("./scoring");
+      const nowIso = new Date().toISOString();
+      const upserts: any[] = [];
+      for (let i = 0; i < pendingItems.length; i++) {
+        const it = pendingItems[i];
+        const r = results[i];
+        const parsed = parseDomain(it.domain);
+        if (!parsed) continue;
+        let st: string;
+        let info: any = null;
+        if (r.status === "fulfilled") {
+          info = r.value;
+          st = info.status === "available" ? "available"
+             : info.status === "registered" ? "registered"
+             : info.status === "reserved" ? "registered"
+             : info.status === "unsupported" ? "unsupported"
+             : info.status === "error" ? "error" : "unknown";
+        } else {
+          st = "error";
+        }
+        const sc = scoreDomain({ name: parsed.name, tld: parsed.tld, risk_level: "low" }, DEFAULT_WEIGHTS);
+        upserts.push({
+          domain: parsed.domain, name: parsed.name, tld: parsed.tld,
+          length: parsed.name.length, type: classifyDomain(parsed.name),
+          status: st, score: sc.total, risk_level: "low",
+          source: "rdap-scan",
+          last_checked_at: nowIso,
+          expiry_date: info?.expiresDate ?? null,
+        });
+      }
+      if (upserts.length) {
+        await supabaseAdmin.from("domains").upsert(upserts, { onConflict: "domain" });
+      }
+    } catch (e: any) {
+      await logEvent(data.jobId, "domains_upsert_failed", { level: "warning", message: String(e?.message ?? e) });
+    }
+
     const { data: cur } = await supabaseAdmin
       .from("jobs")
       .select("checked, available, registered, unsupported, errors, total")
