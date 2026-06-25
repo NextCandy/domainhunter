@@ -62,7 +62,7 @@ export const overviewStatsFn = createServerFn({ method: "GET" }).handler(async (
 // ───────── Discover (paginated, filterable) ─────────
 const DiscoverFilters = z.object({
   q: z.string().trim().max(200).optional(),
-  tlds: z.array(z.string().regex(/^[a-z0-9-]+$/i).max(20)).max(20).optional(),
+  tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).max(300).optional(),
   statuses: z.array(z.string().max(30)).max(8).optional(),
   types: z.array(z.string().max(20)).max(6).optional(),
   minLength: z.number().int().min(1).max(63).optional(),
