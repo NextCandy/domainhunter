@@ -34,6 +34,7 @@ import { Route as AdminRegistrarsRouteImport } from './routes/admin.registrars'
 import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
 import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as AdminHistoryRouteImport } from './routes/admin.history'
+import { Route as ApiPublicHooksSyncPricesRouteImport } from './routes/api/public/hooks/sync-prices'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
 import { Route as ApiPublicEnrichIdDownloadRouteImport } from './routes/api/public/enrich.$id.download'
 
@@ -162,6 +163,12 @@ const AdminHistoryRoute = AdminHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiPublicHooksSyncPricesRoute =
+  ApiPublicHooksSyncPricesRouteImport.update({
+    id: '/api/public/hooks/sync-prices',
+    path: '/api/public/hooks/sync-prices',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicJobsJobIdDownloadRoute =
   ApiPublicJobsJobIdDownloadRouteImport.update({
     id: '/api/public/jobs/$jobId/download',
@@ -201,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
   '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -229,6 +237,7 @@ export interface FileRoutesByTo {
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin': typeof AdminIndexRoute
+  '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
   '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -259,6 +268,7 @@ export interface FileRoutesById {
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
   '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin/'
+    | '/api/public/hooks/sync-prices'
     | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   fileRoutesByTo: FileRoutesByTo
@@ -318,6 +329,7 @@ export interface FileRouteTypes {
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin'
+    | '/api/public/hooks/sync-prices'
     | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   id:
@@ -347,6 +359,7 @@ export interface FileRouteTypes {
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin/'
+    | '/api/public/hooks/sync-prices'
     | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   fileRoutesById: FileRoutesById
@@ -366,6 +379,7 @@ export interface RootRouteChildren {
   WatchlistRoute: typeof WatchlistRoute
   DomainsDomainRoute: typeof DomainsDomainRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
+  ApiPublicHooksSyncPricesRoute: typeof ApiPublicHooksSyncPricesRoute
   ApiPublicEnrichIdDownloadRoute: typeof ApiPublicEnrichIdDownloadRoute
   ApiPublicJobsJobIdDownloadRoute: typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -547,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHistoryRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/public/hooks/sync-prices': {
+      id: '/api/public/hooks/sync-prices'
+      path: '/api/public/hooks/sync-prices'
+      fullPath: '/api/public/hooks/sync-prices'
+      preLoaderRoute: typeof ApiPublicHooksSyncPricesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/jobs/$jobId/download': {
       id: '/api/public/jobs/$jobId/download'
       path: '/api/public/jobs/$jobId/download'
@@ -618,6 +639,7 @@ const rootRouteChildren: RootRouteChildren = {
   WatchlistRoute: WatchlistRoute,
   DomainsDomainRoute: DomainsDomainRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
+  ApiPublicHooksSyncPricesRoute: ApiPublicHooksSyncPricesRoute,
   ApiPublicEnrichIdDownloadRoute: ApiPublicEnrichIdDownloadRoute,
   ApiPublicJobsJobIdDownloadRoute: ApiPublicJobsJobIdDownloadRoute,
 }
