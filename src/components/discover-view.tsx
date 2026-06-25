@@ -86,6 +86,24 @@ export function DiscoverView({
     onError: (e: any) => toast.error(e?.message ?? "创建丰富任务失败"),
   });
 
+  const liveScan = useMutation({
+    mutationFn: () => liveScanFn({
+      data: {
+        tlds: filters.tlds ?? [],
+        q: filters.q,
+        startsWith: filters.startsWith,
+        endsWith: filters.endsWith,
+        contains: filters.contains,
+        limit: 200,
+      },
+    }),
+    onSuccess: (r) => {
+      toast.success(`实时查询完成：扫描 ${r.scanned} 个 · 可注册 ${r.available} · 已注册 ${r.registered} · 错误 ${r.errors}`);
+      refetch();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "实时查询失败"),
+  });
+
   return (
     <AppShell>
       <PageHeader
