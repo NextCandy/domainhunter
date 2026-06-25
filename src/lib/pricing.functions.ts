@@ -133,7 +133,7 @@ export const upsertPriceFn = createServerFn({ method: "POST" })
     notes: z.string().max(500).optional(),
   }).parse(d))
   .handler(async ({ context, data }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const s = sb();
     const payload = { ...data, tld: normTld(data.tld) };
     const { error } = data.id
@@ -147,7 +147,7 @@ export const deletePriceFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number }) => z.object({ id: z.number() }).parse(d))
   .handler(async ({ context, data }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { error } = await sb().from("registrar_prices").delete().eq("id", data.id);
     if (error) throw error;
     return { ok: true };
@@ -195,7 +195,7 @@ export const upsertCouponFn = createServerFn({ method: "POST" })
     status: z.enum(["active", "expired", "disabled"]).default("active"),
   }).parse(d))
   .handler(async ({ context, data }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const payload = { ...data, tlds: data.tlds?.map(normTld) ?? null };
     const { error } = data.id
       ? await sb().from("coupons").update(payload).eq("id", data.id)
@@ -208,7 +208,7 @@ export const deleteCouponFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: number }) => z.object({ id: z.number() }).parse(d))
   .handler(async ({ context, data }) => {
-    await assertAdmin(context.userId);
+    await assertAdmin(context.supabase, context.userId);
     const { error } = await sb().from("coupons").delete().eq("id", data.id);
     if (error) throw error;
     return { ok: true };
