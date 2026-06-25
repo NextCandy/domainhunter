@@ -563,29 +563,44 @@ export const liveScanFn = createServerFn({ method: "POST" })
       }
       names = [seed];
     }
-    // 2) 生成 name × tld 候选
+    // 2) 生成 name × tld 候选 (full cartesian)
     const tlds = Array.from(new Set(data.tlds.map(t => t.toLowerCase().replace(/^\./, ""))));
     const candidates: string[] = [];
-    for (const n of names) for (const t of tlds) {
-      candidates.push(`${n}.${t}`);
-      if (candidates.length >= data.limit) break;
-      // eslint-disable-next-line no-unreachable-loop
-    }
-    const list = candidates.slice(0, data.limit);
-    // 3) 并发 RDAP + upsert
-    let available = 0, registered = 0, unknown = 0, errors = 0;
-    const CONC = 8;
-    let i = 0;
-    await Promise.all(Array.from({ length: CONC }, async () => {
-      while (i < list.length) {
-        const d = list[i++];
-        try {
-          const r = await refreshOneInternal(d);
-          if (r.status === "available") available++;
-          else if (r.status === "registered") registered++;
-          else unknown++;
-        } catch { errors++; }
+    outer: for (const n of names) {
+      for (const t of tlds) {
+        candidates.push(`${n}.${t}`);
+        if (candidates.length >= data.limit) break outer;
       }
+    }
+    const list = Array.from(new Set(candidates)).slice(0, data.limit);
+    if (!list.length) throw new Error("生成的候选域名为空");
+
+    // 3) 落库为标准 job，UI 通过 runJobBatchFn 驱动 + 轮询进度
+    const sb = sbAdmin();
+    const seedName = names[0];
+    const { data: job, error } = await sb
+      .from("jobs")
+      .insert({
+        name: `Live · ${seedName} × ${tlds.length} TLDs`,
+        params: { kind: "live-scan", seed: seedName, names, tlds, source: "discover" } as any,
+        total: list.length,
+        status: "pending",
+      })
+      .select("id")
+      .single();
+    if (error || !job) throw new Error(error?.message ?? "创建任务失败");
+    const jobId = (job as any).id as string;
+
+    const items = list.map(d => ({
+      job_id: jobId,
+      domain: d,
+      tld: d.split(".").slice(1).join("."),
+      status: "pending",
     }));
-    return { scanned: list.length, available, registered, unknown, errors };
+    // 分片插入避免单次过大
+    for (let i = 0; i < items.length; i += 500) {
+      await sb.from("job_items").insert(items.slice(i, i + 500));
+    }
+    return { jobId, total: list.length };
   });
+
