@@ -181,7 +181,7 @@ function IdeasPage() {
             />
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {results.map((d) => <IdeaCard key={d.domain} d={d} onCopy={copy} onCheck={check} onWatch={watch} />)}
+              {results.map((d) => <IdeaCard key={d.domain} d={d} onCopy={copy} onCheck={check} onCompare={comparePrice} onWatch={watch} />)}
             </div>
           )}
         </div>
@@ -190,7 +190,7 @@ function IdeasPage() {
   );
 }
 
-function IdeaCard({ d, onCopy, onCheck, onWatch }: { d: DomainIdea; onCopy: (s: string) => void; onCheck: (s: string) => void; onWatch: (s: string) => Promise<void> }) {
+function IdeaCard({ d, onCopy, onCheck, onCompare, onWatch }: { d: DomainIdea; onCopy: (s: string) => void; onCheck: (s: string) => void; onCompare: (s: string) => void; onWatch: (s: string) => Promise<void> }) {
   return (
     <div className="card-elev flex flex-col gap-2 p-4">
       <div className="flex items-start justify-between gap-2">
@@ -213,20 +213,24 @@ function IdeaCard({ d, onCopy, onCheck, onWatch }: { d: DomainIdea; onCopy: (s: 
         <div className="mt-0.5"><span className="text-foreground font-medium">用途：</span>{d.useCase}</div>
       </div>
 
-      <div className="mt-auto flex gap-1.5 pt-1">
-        <button onClick={() => onCopy(d.domain)} className="btn-base flex-1 justify-center text-xs" title="复制">
+      <div className="mt-auto grid grid-cols-2 gap-1.5 pt-1 sm:grid-cols-4">
+        <button onClick={() => onCopy(d.domain)} className="btn-base justify-center text-xs" title="复制">
           <Copy className="mr-1 h-3.5 w-3.5" />复制
         </button>
-        <button onClick={() => onCheck(d.domain)} className="btn-base flex-1 justify-center text-xs" title="检测可用性">
+        <button onClick={() => onCheck(d.domain)} className="btn-base justify-center text-xs" title="检测可用性">
           <Search className="mr-1 h-3.5 w-3.5" />检测
         </button>
-        <button onClick={() => onWatch(d.domain)} className="btn-base flex-1 justify-center text-xs" title="加入观察列表">
+        <button onClick={() => onCompare(d.domain)} className="btn-base justify-center text-xs" title="对比价格 / 购买推荐">
+          <DollarSign className="mr-1 h-3.5 w-3.5" />比价
+        </button>
+        <button onClick={() => onWatch(d.domain)} className="btn-base justify-center text-xs" title="加入观察列表">
           <Bookmark className="mr-1 h-3.5 w-3.5" />关注
         </button>
       </div>
     </div>
   );
 }
+
 
 function ScoreBar({ label, v }: { label: string; v: number }) {
   const tone = v >= 80 ? "bg-success" : v >= 60 ? "bg-primary" : v >= 40 ? "bg-warning" : "bg-destructive";
