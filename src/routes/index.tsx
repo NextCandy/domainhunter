@@ -790,14 +790,16 @@ function CurrentTask() {
                 retries: Math.max(0, params.retries ?? 1),
               },
             });
-          } catch (err) {
+          } catch (err: any) {
+            const msg = err?.message || String(err) || "批次执行失败";
             console.error("batch error", err);
+            toast.error("批次执行失败", { description: msg, id: "batch-err" });
             await new Promise((r) => setTimeout(r, 1500));
           } finally {
             running = false;
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("poll error", err);
       }
     }
@@ -865,15 +867,35 @@ function CurrentTask() {
             <a className="btn-base btn-ghost" href={`${baseUrl}?kind=errors`}>
               errors.txt
             </a>
+            <a className="btn-base btn-ghost" href={`${baseUrl}?kind=events`}>
+              audit_log.tsv
+            </a>
+            <a className="btn-base btn-ghost" href={`${baseUrl}?kind=error-report`}>
+              error_report.json
+            </a>
             <button
               className="btn-base btn-ghost"
-              onClick={() => requeueErrors({ data: { jobId: job.id } })}
+              onClick={async () => {
+                try {
+                  const r = (await requeueErrors({ data: { jobId: job.id } })) as { requeued: number };
+                  toast.success(`已重新排队 ${r.requeued} 个错误项`);
+                } catch (e: any) {
+                  toast.error("补扫错误项失败", { description: e?.message });
+                }
+              }}
             >
               补扫错误项
             </button>
             <button
               className="btn-base btn-danger"
-              onClick={() => stopJob({ data: { jobId: job.id } })}
+              onClick={async () => {
+                try {
+                  await stopJob({ data: { jobId: job.id } });
+                  toast.warning("已请求停止任务");
+                } catch (e: any) {
+                  toast.error("停止任务失败", { description: e?.message });
+                }
+              }}
             >
               停止任务
             </button>
