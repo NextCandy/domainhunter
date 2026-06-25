@@ -1,7 +1,7 @@
 // Shared Discover view used by /discover, /deleted, /pending.
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Filter, RefreshCw, Search, Sparkles, X, Download, RotateCw, SkipForward, Zap } from "lucide-react";
+import { Filter, RefreshCw, Search, Sparkles, X, Download, RotateCw, SkipForward, Zap, Activity, Settings2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
@@ -42,6 +42,11 @@ export function DiscoverView({
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const pausedRef = useRef(false);
 
+  // ── 可配置扫描策略（实时生效） ──
+  const [strategy, setStrategy] = useState({ batchSize: 10, pauseMs: 600, maxRetries: 2, timeoutMs: 30000 });
+  const strategyRef = useRef(strategy);
+  useEffect(() => { strategyRef.current = strategy; }, [strategy]);
+
   // ── Single-domain quick lookup ──
   const [quickDomain, setQuickDomain] = useState("");
   const [quickResult, setQuickResult] = useState<any | null>(null);
@@ -55,6 +60,38 @@ export function DiscoverView({
       toast.success(`${(r as any).domain} · ${tag}`);
     },
     onError: (e: any) => { setQuickResult({ status: "error", error: e?.message }); toast.error(e?.message ?? "查询失败"); },
+  });
+
+  // ── RDAP 连通性 / 限流测试 ──
+  const [pingDomain, setPingDomain] = useState("example.com");
+  const [pingResult, setPingResult] = useState<{
+    ok: boolean; status: string; latencyMs: number; rateLimited: boolean; source?: string; error?: string;
+  } | null>(null);
+  const pingTest = useMutation({
+    mutationFn: async (d: string) => {
+      const t0 = performance.now();
+      try {
+        const r: any = await lookupDomainFn({ data: { domain: d } });
+        const latencyMs = Math.round(performance.now() - t0);
+        const err = (r.error ?? "").toString().toLowerCase();
+        const rateLimited = /429|rate.?limit|too many/.test(err);
+        return {
+          ok: r.status !== "error",
+          status: r.status, latencyMs, rateLimited,
+          source: r.source, error: r.error,
+        };
+      } catch (e: any) {
+        const latencyMs = Math.round(performance.now() - t0);
+        const msg = e?.message ?? "网络错误";
+        return { ok: false, status: "error", latencyMs, rateLimited: /429|rate.?limit/i.test(msg), error: msg };
+      }
+    },
+    onSuccess: (r) => {
+      setPingResult(r);
+      if (r.rateLimited) toast.error(`已被限流（${r.latencyMs}ms），建议调高批间隔`);
+      else if (r.ok) toast.success(`RDAP 正常 · ${r.latencyMs}ms · ${r.source ?? ""}`);
+      else toast.error(`RDAP 异常：${r.error ?? r.status}`);
+    },
   });
 
   const { data, isFetching, refetch } = useQuery({
@@ -119,16 +156,14 @@ export function DiscoverView({
     onError: (e: any) => toast.error(e?.message ?? "创建实时任务失败"),
   });
 
-  // 队列驱动：分批调用 runJobBatchFn，限速 + 进度
+  // 队列驱动：分批调用 runJobBatchFn，限速 + 进度（使用 strategyRef 的实时值）
   async function runQueue(jobId: string) {
-    const BATCH = 10;            // 单批并发请求
-    const PAUSE_MS = 600;        // 批间隔，避免被 RDAP 限流
     let consecutiveErrors = 0;
-    let waitMs = PAUSE_MS;
+    let waitMs = strategyRef.current.pauseMs;
     while (!pausedRef.current) {
+      const s = strategyRef.current;
       try {
-        const res: any = await runJobBatchFn({ data: { jobId, batchSize: BATCH, retries: 2, timeoutMs: 30_000 } });
-        // 拉取进度（保证 UI 数字准确）
+        const res: any = await runJobBatchFn({ data: { jobId, batchSize: s.batchSize, retries: s.maxRetries, timeoutMs: s.timeoutMs } });
         const p: any = await jobProgressFn({ data: { jobId } });
         const job = p.job;
         setProgress((prev) => prev && {
@@ -143,11 +178,11 @@ export function DiscoverView({
           break;
         }
         consecutiveErrors = 0;
-        waitMs = PAUSE_MS;
+        waitMs = s.pauseMs;
         await sleep(waitMs);
       } catch (e: any) {
         consecutiveErrors++;
-        waitMs = Math.min(8000, waitMs * 2); // 指数退避，避免持续被限流
+        waitMs = Math.min(8000, Math.max(waitMs, s.pauseMs) * 2);
         toast.error(`批次失败（${consecutiveErrors}）：${e?.message ?? "未知错误"}`);
         if (consecutiveErrors >= 5) {
           setProgress((prev) => prev && { ...prev, status: "error" });
@@ -157,6 +192,7 @@ export function DiscoverView({
       }
     }
   }
+
 
   const retryErrors = useMutation({
     mutationFn: () => requeueErrorsFn({ data: { jobId: progress!.jobId } }),
@@ -234,6 +270,68 @@ export function DiscoverView({
             </div>
           )}
         </div>
+      </div>
+
+      {/* RDAP 连通性 / 限流测试 */}
+      <div className="card-elev mb-4 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">RDAP 连通性测试</span>
+          <input
+            value={pingDomain}
+            onChange={(e) => setPingDomain(e.target.value.trim().toLowerCase())}
+            onKeyDown={(e) => { if (e.key === "Enter" && pingDomain) pingTest.mutate(pingDomain); }}
+            placeholder="example.com"
+            className="field flex-1 min-w-[200px]"
+          />
+          <button type="button" disabled={!pingDomain || pingTest.isPending}
+            onClick={() => pingTest.mutate(pingDomain)}
+            className="btn-base btn-primary">
+            {pingTest.isPending ? "测试中…" : "测试连通性"}
+          </button>
+          {pingResult && (
+            <div className="w-full text-xs font-mono mt-2 break-all">
+              <span className={`mr-2 rounded px-1.5 py-0.5 font-semibold ${
+                pingResult.rateLimited ? "bg-rose-500/15 text-rose-700 dark:text-rose-300" :
+                pingResult.ok ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
+                "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+              }`}>
+                {pingResult.rateLimited ? "已被限流" : pingResult.ok ? "连通正常" : "异常"}
+              </span>
+              <span className="text-muted-foreground">
+                状态: {pingResult.status} · 延迟: {pingResult.latencyMs}ms
+                {pingResult.source && <> · 来源: {pingResult.source}</>}
+                {pingResult.error && <span className="text-rose-600"> · {pingResult.error}</span>}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 扫描策略 (实时生效) */}
+      <div className="card-elev mb-4 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">扫描策略</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            当前: {strategy.batchSize}/批 · {strategy.pauseMs}ms 间隔 · 重试 {strategy.maxRetries} · 超时 {strategy.timeoutMs}ms · 理论速率 ~{(strategy.batchSize * 1000 / (strategy.pauseMs + 50)).toFixed(1)}/s
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <StratNum label="每批数量" min={1} max={50} value={strategy.batchSize}
+            onChange={(v) => setStrategy(s => ({ ...s, batchSize: v }))} />
+          <StratNum label="批间隔 (ms)" min={100} max={10000} step={100} value={strategy.pauseMs}
+            onChange={(v) => setStrategy(s => ({ ...s, pauseMs: v }))} />
+          <StratNum label="最大重试" min={0} max={5} value={strategy.maxRetries}
+            onChange={(v) => setStrategy(s => ({ ...s, maxRetries: v }))} />
+          <StratNum label="超时 (ms)" min={5000} max={60000} step={1000} value={strategy.timeoutMs}
+            onChange={(v) => setStrategy(s => ({ ...s, timeoutMs: v }))} />
+        </div>
+        {progress && (
+          <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+            调整将在下一个批次生效（当前任务正在运行）
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
@@ -370,5 +468,22 @@ function Stat({ label, value, accent }: { label: string; value: number | string;
       <div className={`text-base font-semibold ${cls}`}>{value}</div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
     </div>
+  );
+}
+
+function StratNum({ label, value, onChange, min, max, step = 1 }: {
+  label: string; value: number; onChange: (v: number) => void; min: number; max: number; step?: number;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <input type="number" min={min} max={max} step={step} value={value}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (!Number.isFinite(n)) return;
+          onChange(Math.max(min, Math.min(max, n)));
+        }}
+        className="field w-full" />
+    </label>
   );
 }
