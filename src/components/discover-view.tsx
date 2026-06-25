@@ -1,7 +1,7 @@
 // Shared Discover view used by /discover, /deleted, /pending.
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Filter, RefreshCw, Search, Sparkles, X, Download, RotateCw, SkipForward, Zap } from "lucide-react";
+import { Filter, RefreshCw, Search, Sparkles, X, Download, RotateCw, SkipForward, Zap, Activity, Settings2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
