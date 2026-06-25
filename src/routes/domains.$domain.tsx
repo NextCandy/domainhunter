@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Eye, ExternalLink, ArrowLeft } from "lucide-react";
+import { RefreshCw, Eye, ExternalLink, ArrowLeft, Sparkles } from "lucide-react";
 import { AppShell, ScoreBadge, StatusBadge, RiskBadge, EmptyState } from "@/components/app-shell";
-import { domainDetailFn, refreshDomainFn, toggleWatchFn, checkRelatedTldsFn } from "@/lib/discover.functions";
+import { domainDetailFn, refreshDomainFn, toggleWatchFn, checkRelatedTldsFn, enrichDomainFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/domains/$domain")({
@@ -31,6 +31,11 @@ function DomainDetailPage() {
   const watchMut = useMutation({
     mutationFn: () => toggleWatchFn({ data: { domain } }),
     onSuccess: r => { toast.success(r.watching ? "已加入观察列表" : "已从观察移除"); refetch(); },
+  });
+  const enrichMut = useMutation({
+    mutationFn: () => enrichDomainFn({ data: { domain } }),
+    onSuccess: r => { toast.success(`已抓取 DNS · A=${r.dns.a_records.length} NS=${r.dns.ns_records.length}${r.archive.archive_year ? ` · Archive ${r.archive.archive_year}` : ""}`); refetch(); },
+    onError: (e: any) => toast.error(e?.message ?? "抓取失败"),
   });
 
   if (isLoading) return <AppShell><div className="card-elev p-10 text-center text-sm text-muted-foreground">加载中…</div></AppShell>;
@@ -68,8 +73,9 @@ function DomainDetailPage() {
               <span className="text-muted-foreground">{d.length} 字符 · {d.type}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => refreshMut.mutate()} disabled={refreshMut.isPending} className="btn-base btn-ghost"><RefreshCw className={`h-4 w-4 ${refreshMut.isPending ? "animate-spin" : ""}`} />刷新</button>
+            <button onClick={() => enrichMut.mutate()} disabled={enrichMut.isPending} className="btn-base btn-ghost"><Sparkles className={`h-4 w-4 ${enrichMut.isPending ? "animate-pulse" : ""}`} />{enrichMut.isPending ? "抓取中…" : "丰富 DNS/Archive"}</button>
             <button onClick={() => watchMut.mutate()} className={`btn-base ${watching ? "btn-ghost" : "btn-primary"}`}><Eye className="h-4 w-4" />{watching ? "已观察" : "加入观察"}</button>
             <a href={`https://www.namecheap.com/domains/registration/results/?domain=${d.domain}`} target="_blank" rel="noreferrer" className="btn-base btn-primary"><ExternalLink className="h-4 w-4" />注册</a>
           </div>
@@ -118,7 +124,7 @@ function DomainDetailPage() {
           <KV k="Archive 抓取" v={String(m?.archive_count ?? 0)} />
           <KV k="外链 BL" v={String(m?.backlinks ?? 0)} />
           <KV k="引用域名 DP" v={String(m?.referring_domains ?? 0)} />
-          <p className="mt-3 text-xs text-muted-foreground">外部 SEO/Archive API 接入将在后续版本提供。</p>
+          <p className="mt-3 text-xs text-muted-foreground">Archive 数据来自 Wayback Machine 公共 API。Ahrefs / Majestic 等外链数据需付费接入。</p>
         </Card>
 
         <Card title="相关后缀注册情况">

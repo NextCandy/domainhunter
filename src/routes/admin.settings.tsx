@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { getSettingsFn, saveSettingsFn } from "@/lib/discover.functions";
+import { getSettingsFn, saveSettingsFn, sendTestNotificationFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
+import { Send } from "lucide-react";
 
 export const Route = createFileRoute("/admin/settings")({
   component: AdminSettings,
@@ -28,6 +29,16 @@ function AdminSettings() {
     mutationFn: () => saveSettingsFn({ data: { settings: form } }),
     onSuccess: () => { toast.success("已保存"); qc.invalidateQueries({ queryKey: ["app-settings"] }); },
     onError: (e: any) => toast.error(e?.message ?? "保存失败"),
+  });
+  const testNotify = useMutation({
+    mutationFn: () => sendTestNotificationFn({ data: { bark: form.notify_bark ?? "", webhook: form.notify_webhook ?? "" } }),
+    onSuccess: r => {
+      const okN = r.results.filter(x => x.ok).length;
+      const failN = r.results.length - okN;
+      if (failN === 0) toast.success(`已发送 ${okN} 条测试通知`);
+      else toast.warning(`成功 ${okN} · 失败 ${failN}：${r.results.filter(x => !x.ok).map(x => `${x.channel}(${x.status ?? x.error})`).join(", ")}`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "发送失败"),
   });
 
   const F = (k: keyof SettingsShape, label: string, placeholder?: string) => (
@@ -55,7 +66,10 @@ function AdminSettings() {
           {F("notify_bark", "Bark URL", "https://api.day.app/xxx")}
           {F("notify_webhook", "Webhook URL", "https://...")}
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">本版本仅保存配置；实际通知发送将在后续接入。</p>
+        <div className="mt-3 flex items-center gap-2">
+          <button onClick={() => testNotify.mutate()} disabled={testNotify.isPending || (!form.notify_bark && !form.notify_webhook)} className="btn-base btn-ghost"><Send className="h-4 w-4" />{testNotify.isPending ? "发送中…" : "发送测试通知"}</button>
+          <p className="text-[11px] text-muted-foreground">支持 Bark / 通用 Webhook（POST JSON）。邮件 / Telegram 将在后续接入。</p>
+        </div>
       </section>
       <div className="lg:col-span-2">
         <button onClick={() => save.mutate()} disabled={save.isPending} className="btn-base btn-primary">{save.isPending ? "保存中…" : "保存全部设置"}</button>
