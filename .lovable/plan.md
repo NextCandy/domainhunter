@@ -1,60 +1,54 @@
-## DomainHunter 升级计划：从批量查询工具 → 过期域名发现平台
+# 实施计划
 
-当前项目是一个域名批量 RDAP 查询工具（带任务队列、审计日志）。本计划将其升级为一个完整的过期域名发现/筛选/评分/观察平台，参考 ExpiredDomains 的产品结构（不抓取其数据）。
+## 1. 用户系统（仅管理员）
+- 启用 Email/Password + Google OAuth 登录
+- 新增 `user_roles` 表 + `app_role` enum（仅 `admin`）+ `has_role()` security definer 函数
+- 新建 `/auth` 公开登录页（邮箱/密码 + Google）
+- 将所有现有管理/操作页面（`/`, `/discover`, `/admin.*`, `/domains/*`, `/watchlist` 等）迁移到 `_authenticated/` 子树
+- `_authenticated/route.tsx` 内增加 admin 角色校验：非 admin 用户登出并提示"仅管理员可访问"
+- 首位注册用户自动授予 admin 角色（trigger on auth.users insert）；后续注册需现有 admin 在 `/admin.users` 页授权
+- 现有数据表 RLS 策略收紧：从 anon 改为 `has_role(auth.uid(), 'admin')`
 
-### 一、范围与 MVP 优先级
+## 2. Enrich 任务系统（DNS / Archive / SEO）
+新增表：
+- `enrich_jobs` — id, source_job_id (关联 jobs), kinds (text[]: dns/archive/seo), status, total, done, failed, cached_hits, started_at, finished_at, error
+- `enrich_items` — id, enrich_job_id, domain, kind, status (pending/running/done/error/cached), result jsonb, error, attempted_at
+- `enrich_cache` — domain + kind 复合主键, payload jsonb, fetched_at, ttl_seconds（DNS=6h, Archive=7d, SEO=1d）
 
-考虑到工作量巨大，采用分阶段交付。**本次先交付 MVP（阶段 1+2），其余阶段后续按需推进。**
+流程：
+1. 批量 `jobs` 完成后（status='done'），如开关启用，自动 INSERT enrich_job 入队对应"未注册=可注册"或"已注册"域名（用户在创建任务时选择目标范围）
+2. 后台 server fn `runEnrichBatchFn` 按 concurrency 处理 N 项；每项先查 `enrich_cache`（未过期则命中并标记 cached），未命中调用 `fetchDns`/`fetchArchive`/`fetchSeo` 后回写 cache 与 `domain_metrics`/`domain_dns`
+3. 断点续查：进程中断后下次启动时 `enrich_items.status='pending'/'running'` 的继续；进度 = done+failed+cached / total
 
-**阶段 1（核心数据层 + 评分）**
-- 新建数据模型：`domains`、`domain_metrics`、`domain_whois`、`domain_dns`、`watchlist`、`registrars`、`data_sources`（与现有 `jobs`/`job_items`/`job_events` 共存）
-- 评分引擎：100 分制规则化模型（长度/语义/后缀/Archive/外链/相关后缀/风险扣分），可在 `/admin/scoring` 调整权重
-- 数据导入：TXT/CSV 导入 → 写入 `domains` → 自动入队 RDAP 检查 → 评分
-- 复用现有 RDAP 引擎做"可注册"检测，结果写入 `domains.status` + `domain_whois`
+UI：
+- `/enrich` 路由：列出所有 enrich_jobs，进度条（done/cached/failed/total）、速率、ETA
+- 详情页 `/enrich/$id`：实时进度 + 最近完成 + 错误列表
+- 在批量任务表单中加"完成后自动 enrich"开关 + 类型勾选（DNS / Archive / SEO）
+- "继续执行"按钮（手动触发未完成项）
 
-**阶段 2（核心 UI）**
-- 浅色风格重设计（背景 #F6F8FB / 主色 #2563EB），保留终端式工具作为子页 `/tools/batch-rdap`
-- 新顶部导航：DomainHunter / 发现 / 已删除 / 待删除 / 拍卖 / 观察 / 我的域名 / 后台
-- `/` 首页：搜索框 + 5 张概览卡（今日新增 / 可注册 / 待删除 / 高分 / 观察中）+ 推荐域名列表
-- `/discover` 发现页：左侧筛选器（后缀、长度、状态、字符类型、关键词、正则、最低评分、Archive 年份、外链、删除时间），右侧服务端分页表格（综合评分、状态、BL、DP、ABY、删除时间、操作）。移动端筛选器改为底部抽屉、列表改为卡片
-- `/deleted`、`/pending`、`/auctions`：基于 `/discover` 的预设过滤视图（拍卖表保留 platform/price/end_time 字段但暂不接入真实 API）
-- `/watchlist`：观察列表 CRUD + 标签 + 备注 + 提醒开关（提醒触发通道留接口，不发邮件）
-- `/domains/:domain` 详情页：基础信息 + WHOIS/RDAP + DNS（占位） + Archive/SEO（占位） + 相关后缀检查（实时复用 RDAP）
-- `/my-domains`：已购域名管理（手动录入）
+## 3. SEO 数据源
+- 新增 `fetchSeo`：优先使用 Semrush 连接器（如已连接）取 domain_analysis 关键指标；否则置空并标记 skipped
+- 写入 `domain_metrics`（da/pa/backlinks/traffic 等列已存在）
 
-**阶段 3（后台 + 任务，本次仅留入口与最小实现）**
-- `/admin/sources`：TXT/CSV 导入 UI（启用）
-- `/admin/scoring`：评分权重编辑（启用）
-- `/admin/settings`：站点名/主题色/通知开关（启用，仅本地保存）
-- `/admin/registrars`、`/admin/jobs`：UI 骨架 + 配置存储（密钥用 base64 占位加密，真实接入留待后续）
+## 4. Enriched 结果批量导出
+- 公开下载接口 `/api/public/enrich/$id/download?kind=enriched_csv|enriched_json|available_enriched_csv`
+- 字段：domain, registered, registrar, expiry, dns_a, dns_ns, archive_first_year, archive_snapshots, seo_da, seo_backlinks, seo_traffic, score
+- 通过短期签名 token（query param）+ 服务端校验 `enrich_jobs` 存在；非 PII，公共可访问以便 cron/外部下载
 
-**阶段 4（暂不在本次交付）**
-- 真实 SEO/Archive API 接入（Ahrefs / Wayback 真实查询）
-- 注册商 API 真实下单
-- 邮件 / Telegram / Bark / Webhook 通知发送
-- 用户系统（本次假定单用户/匿名，沿用现有匿名 RLS）
+## 5. 边界与提示
+- enrich concurrency 1-20，QPS 1-50，cache TTL 1h-30d 表单校验
+- toast 错误提示（外部 API 失败、签名失效等）
 
-### 二、技术要点
+## 技术细节
+- 全部 server fn 加 `requireSupabaseAuth` + admin 角色校验
+- 批量任务完成回调：在现有 `runJobBatchFn` 末尾检测 job 完成且 `params.auto_enrich=true` → 创建 enrich_job
+- 客户端用 `useQuery` 轮询 enrich 进度（2s 间隔），完成后停止
+- 表 GRANT：authenticated 完整 CRUD，无 anon
 
-- **栈**：保留 TanStack Start + Lovable Cloud（Supabase）+ Tailwind v4
-- **路由**：在 `src/routes/` 新增 `discover.tsx`、`deleted.tsx`、`pending.tsx`、`auctions.tsx`、`watchlist.tsx`、`my-domains.tsx`、`domains.$domain.tsx`、`admin.tsx`（layout）+ admin 子路由、`tools.batch-rdap.tsx`（迁移现有 `index.tsx` 内容）
-- **服务端函数**：`src/lib/discover.functions.ts`（分页查询 + 多列筛选/排序）、`src/lib/scoring.ts`（纯函数评分）、`src/lib/import.functions.ts`（导入 + 入队）、`src/lib/watchlist.functions.ts`
-- **性能**：服务端分页（默认 50/页），筛选字段建索引（domain/tld/status/score/length/drop_date/archive_year/backlinks/risk_level）
-- **安全**：注册商密钥字段命名 `*_encrypted`、`/admin/*` 暂用单一访问密码门控（写入 localStorage + server 校验环境变量，未配置时允许本地访问并显示提示）
-- **设计令牌**：在 `src/styles.css` 重写 oklch 令牌为浅色面板风格
-
-### 三、文件改动概览
-
-- 新建迁移：domains/metrics/whois/dns/watchlist/registrars/data_sources/scoring_rules（含 GRANT + RLS + 索引）
-- 新建 `src/lib/scoring.ts`、`src/lib/discover.functions.ts`、`src/lib/import.functions.ts`、`src/lib/watchlist.functions.ts`、`src/lib/admin.functions.ts`
-- 新建路由若干（见上）；将现有 `src/routes/index.tsx` 拆为新 `index.tsx`（概览）+ `tools.batch-rdap.tsx`（保留原全部功能）
-- 新建组件：`AppShell`（顶部导航）、`StatCard`、`DomainTable`、`DomainCardMobile`、`FilterPanel`、`FilterDrawer`、`ScoreBadge`、`RiskBadge`
-- `src/styles.css`：浅色主题令牌
-- `src/routes/__root.tsx`：使用 `AppShell` 包裹
-
-### 四、明确不做
-
-- 不爬取 ExpiredDomains 任何数据；所有"已删除/待删除/拍卖"数据均来自用户导入或现有 RDAP 检测结果
-- 不接入真实 Ahrefs/Majestic/Wayback API（字段保留，值为空或 0）
-- 不实现自动抢注/自动购买
-- 不实现真实通知发送
+## 文件改动概要
+- supabase migration：user_roles + enrich_jobs/items/cache + RLS 重写
+- 新 `src/lib/enrich-jobs.functions.ts`、`src/lib/seo.server.ts`
+- 改 `src/lib/rdap.functions.ts`（完成钩子）
+- 新 `src/routes/auth.tsx`、`src/routes/_authenticated/enrich.tsx`、`enrich.$id.tsx`、`admin.users.tsx`
+- 迁移所有现有受保护页面到 `_authenticated/`
+- 新 `src/routes/api/public/enrich.$id.download.ts`

@@ -12,20 +12,25 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WatchlistRouteImport } from './routes/watchlist'
 import { Route as PendingRouteImport } from './routes/pending'
 import { Route as MyDomainsRouteImport } from './routes/my-domains'
+import { Route as EnrichRouteImport } from './routes/enrich'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DeletedRouteImport } from './routes/deleted'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuctionsRouteImport } from './routes/auctions'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
+import { Route as EnrichIdRouteImport } from './routes/enrich.$id'
 import { Route as DomainsDomainRouteImport } from './routes/domains.$domain'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSourcesRouteImport } from './routes/admin.sources'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminScoringRouteImport } from './routes/admin.scoring'
 import { Route as AdminRegistrarsRouteImport } from './routes/admin.registrars'
 import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
+import { Route as ApiPublicEnrichIdDownloadRouteImport } from './routes/api/public/enrich.$id.download'
 
 const WatchlistRoute = WatchlistRouteImport.update({
   id: '/watchlist',
@@ -42,6 +47,11 @@ const MyDomainsRoute = MyDomainsRouteImport.update({
   path: '/my-domains',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EnrichRoute = EnrichRouteImport.update({
+  id: '/enrich',
+  path: '/enrich',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DiscoverRoute = DiscoverRouteImport.update({
   id: '/discover',
   path: '/discover',
@@ -50,6 +60,11 @@ const DiscoverRoute = DiscoverRouteImport.update({
 const DeletedRoute = DeletedRouteImport.update({
   id: '/deleted',
   path: '/deleted',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuctionsRoute = AuctionsRouteImport.update({
@@ -77,10 +92,20 @@ const ToolsBatchRdapRoute = ToolsBatchRdapRouteImport.update({
   path: '/tools/batch-rdap',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EnrichIdRoute = EnrichIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => EnrichRoute,
+} as any)
 const DomainsDomainRoute = DomainsDomainRouteImport.update({
   id: '/domains/$domain',
   path: '/domains/$domain',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminSourcesRoute = AdminSourcesRouteImport.update({
   id: '/sources',
@@ -113,13 +138,21 @@ const ApiPublicJobsJobIdDownloadRoute =
     path: '/api/public/jobs/$jobId/download',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicEnrichIdDownloadRoute =
+  ApiPublicEnrichIdDownloadRouteImport.update({
+    id: '/api/public/enrich/$id/download',
+    path: '/api/public/enrich/$id/download',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auctions': typeof AuctionsRoute
+  '/auth': typeof AuthRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/enrich': typeof EnrichRouteWithChildren
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
@@ -128,16 +161,21 @@ export interface FileRoutesByFullPath {
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/domains/$domain': typeof DomainsDomainRoute
+  '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auctions': typeof AuctionsRoute
+  '/auth': typeof AuthRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/enrich': typeof EnrichRouteWithChildren
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
@@ -146,9 +184,12 @@ export interface FileRoutesByTo {
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/domains/$domain': typeof DomainsDomainRoute
+  '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin': typeof AdminIndexRoute
+  '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRoutesById {
@@ -156,8 +197,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auctions': typeof AuctionsRoute
+  '/auth': typeof AuthRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/enrich': typeof EnrichRouteWithChildren
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
@@ -166,9 +209,12 @@ export interface FileRoutesById {
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/domains/$domain': typeof DomainsDomainRoute
+  '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRouteTypes {
@@ -177,8 +223,10 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auctions'
+    | '/auth'
     | '/deleted'
     | '/discover'
+    | '/enrich'
     | '/my-domains'
     | '/pending'
     | '/watchlist'
@@ -187,16 +235,21 @@ export interface FileRouteTypes {
     | '/admin/scoring'
     | '/admin/settings'
     | '/admin/sources'
+    | '/admin/users'
     | '/domains/$domain'
+    | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin/'
+    | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auctions'
+    | '/auth'
     | '/deleted'
     | '/discover'
+    | '/enrich'
     | '/my-domains'
     | '/pending'
     | '/watchlist'
@@ -205,17 +258,22 @@ export interface FileRouteTypes {
     | '/admin/scoring'
     | '/admin/settings'
     | '/admin/sources'
+    | '/admin/users'
     | '/domains/$domain'
+    | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin'
+    | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/auctions'
+    | '/auth'
     | '/deleted'
     | '/discover'
+    | '/enrich'
     | '/my-domains'
     | '/pending'
     | '/watchlist'
@@ -224,9 +282,12 @@ export interface FileRouteTypes {
     | '/admin/scoring'
     | '/admin/settings'
     | '/admin/sources'
+    | '/admin/users'
     | '/domains/$domain'
+    | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin/'
+    | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   fileRoutesById: FileRoutesById
 }
@@ -234,13 +295,16 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AuctionsRoute: typeof AuctionsRoute
+  AuthRoute: typeof AuthRoute
   DeletedRoute: typeof DeletedRoute
   DiscoverRoute: typeof DiscoverRoute
+  EnrichRoute: typeof EnrichRouteWithChildren
   MyDomainsRoute: typeof MyDomainsRoute
   PendingRoute: typeof PendingRoute
   WatchlistRoute: typeof WatchlistRoute
   DomainsDomainRoute: typeof DomainsDomainRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
+  ApiPublicEnrichIdDownloadRoute: typeof ApiPublicEnrichIdDownloadRoute
   ApiPublicJobsJobIdDownloadRoute: typeof ApiPublicJobsJobIdDownloadRoute
 }
 
@@ -267,6 +331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MyDomainsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/enrich': {
+      id: '/enrich'
+      path: '/enrich'
+      fullPath: '/enrich'
+      preLoaderRoute: typeof EnrichRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/discover': {
       id: '/discover'
       path: '/discover'
@@ -279,6 +350,13 @@ declare module '@tanstack/react-router' {
       path: '/deleted'
       fullPath: '/deleted'
       preLoaderRoute: typeof DeletedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auctions': {
@@ -316,12 +394,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ToolsBatchRdapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/enrich/$id': {
+      id: '/enrich/$id'
+      path: '/$id'
+      fullPath: '/enrich/$id'
+      preLoaderRoute: typeof EnrichIdRouteImport
+      parentRoute: typeof EnrichRoute
+    }
     '/domains/$domain': {
       id: '/domains/$domain'
       path: '/domains/$domain'
       fullPath: '/domains/$domain'
       preLoaderRoute: typeof DomainsDomainRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/sources': {
       id: '/admin/sources'
@@ -365,6 +457,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicJobsJobIdDownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/enrich/$id/download': {
+      id: '/api/public/enrich/$id/download'
+      path: '/api/public/enrich/$id/download'
+      fullPath: '/api/public/enrich/$id/download'
+      preLoaderRoute: typeof ApiPublicEnrichIdDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -374,6 +473,7 @@ interface AdminRouteChildren {
   AdminScoringRoute: typeof AdminScoringRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSourcesRoute: typeof AdminSourcesRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -383,22 +483,37 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminScoringRoute: AdminScoringRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSourcesRoute: AdminSourcesRoute,
+  AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface EnrichRouteChildren {
+  EnrichIdRoute: typeof EnrichIdRoute
+}
+
+const EnrichRouteChildren: EnrichRouteChildren = {
+  EnrichIdRoute: EnrichIdRoute,
+}
+
+const EnrichRouteWithChildren =
+  EnrichRoute._addFileChildren(EnrichRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AuctionsRoute: AuctionsRoute,
+  AuthRoute: AuthRoute,
   DeletedRoute: DeletedRoute,
   DiscoverRoute: DiscoverRoute,
+  EnrichRoute: EnrichRouteWithChildren,
   MyDomainsRoute: MyDomainsRoute,
   PendingRoute: PendingRoute,
   WatchlistRoute: WatchlistRoute,
   DomainsDomainRoute: DomainsDomainRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
+  ApiPublicEnrichIdDownloadRoute: ApiPublicEnrichIdDownloadRoute,
   ApiPublicJobsJobIdDownloadRoute: ApiPublicJobsJobIdDownloadRoute,
 }
 export const routeTree = rootRouteImport

@@ -257,6 +257,9 @@ function NewTask() {
   const [maxTotal, setMaxTotal] = useState<number>(LIMITS.maxTotal.default);
   const [timeout, setTimeout] = useState<number>(LIMITS.timeoutSec.default);
   const [retries, setRetries] = useState<number>(LIMITS.retries.default);
+  const [autoEnrich, setAutoEnrich] = useState<boolean>(false);
+  const [autoEnrichKinds, setAutoEnrichKinds] = useState<string[]>(["dns", "archive"]);
+  const [autoEnrichScope, setAutoEnrichScope] = useState<"available" | "registered" | "all">("available");
 
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -398,6 +401,7 @@ function NewTask() {
         format, customPattern, filterType, filterValue, mustLetter, mustDigit,
         tldSource, customTlds, tldLength,
         qps, concurrency, perHostQps, limit, maxTotal, timeout, retries,
+        auto_enrich: autoEnrich ? { enabled: true, kinds: autoEnrichKinds, scope: autoEnrichScope } : null,
       };
       const res = (await create({
         data: { name: taskName.trim() || defaultTaskName(), params, domains: [...all] },
@@ -588,9 +592,36 @@ function NewTask() {
               <NumField label="超时(秒)" value={timeout} setValue={setTimeout} bounds={LIMITS.timeoutSec} />
               <NumField label="重试" value={retries} setValue={setRetries} bounds={LIMITS.retries} />
             </div>
+            <div className="mt-3 rounded-md border border-border bg-accent/30 p-2.5">
+              <label className="flex items-center gap-2 text-xs font-medium">
+                <input type="checkbox" checked={autoEnrich} onChange={e => setAutoEnrich(e.target.checked)} />
+                完成后自动丰富抓取（DNS / Archive / SEO）
+              </label>
+              {autoEnrich && (
+                <div className="mt-2 space-y-2 text-xs">
+                  <div className="flex flex-wrap gap-2">
+                    {["dns","archive","seo"].map(k => (
+                      <label key={k} className="flex items-center gap-1">
+                        <input type="checkbox" checked={autoEnrichKinds.includes(k)}
+                          onChange={e => setAutoEnrichKinds(s => e.target.checked ? [...s, k] : s.filter(x => x !== k))} />
+                        {k.toUpperCase()}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">范围：
+                    <select value={autoEnrichScope} onChange={e => setAutoEnrichScope(e.target.value as any)} className="field text-xs">
+                      <option value="available">仅可注册</option>
+                      <option value="registered">仅已注册</option>
+                      <option value="all">全部</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
 
       <div className="mt-5 pt-5 border-t border-border flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs">

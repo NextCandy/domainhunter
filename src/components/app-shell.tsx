@@ -1,6 +1,7 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
-import { Menu, X, Search } from "lucide-react";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, type ReactNode } from "react";
+import { Menu, X, Search, LogOut } from "lucide-react";
+import { useAuth, signOut } from "@/lib/auth-client";
 
 const NAV = [
   { to: "/", label: "概览" },
@@ -10,12 +11,35 @@ const NAV = [
   { to: "/auctions", label: "拍卖" },
   { to: "/watchlist", label: "观察列表" },
   { to: "/my-domains", label: "我的域名" },
+  { to: "/enrich", label: "丰富抓取" },
   { to: "/admin", label: "后台" },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: s => s.location.pathname });
   const [open, setOpen] = useState(false);
+  const auth = useAuth();
+  const nav = useNavigate();
+
+  useEffect(() => {
+    if (!auth.loading && !auth.userId) nav({ to: "/auth" });
+  }, [auth.loading, auth.userId, nav]);
+
+  if (auth.loading) {
+    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">加载中…</div>;
+  }
+  if (!auth.userId) return null;
+  if (!auth.isAdmin) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4 text-center">
+        <div className="max-w-md">
+          <h1 className="text-xl font-semibold">未授权访问</h1>
+          <p className="mt-2 text-sm text-muted-foreground">当前账号 ({auth.email}) 没有管理员权限。请联系管理员授权，或换号登录。</p>
+          <button onClick={() => signOut().then(() => nav({ to: "/auth" }))} className="btn-base btn-primary mt-4">退出登录</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -50,6 +74,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
             <button
               type="button"
+              onClick={() => signOut().then(() => nav({ to: "/auth" }))}
+              title={auth.email ?? "退出"}
+              className="hidden items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground sm:flex"
+            >
+              <LogOut className="h-3.5 w-3.5" />退出
+            </button>
+            <button
+              type="button"
               onClick={() => setOpen(v => !v)}
               className="grid h-9 w-9 place-items-center rounded-md border border-border bg-surface lg:hidden"
               aria-label="菜单"
@@ -58,6 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           </div>
         </div>
+
 
         {open && (
           <div className="border-t border-border bg-surface lg:hidden">
