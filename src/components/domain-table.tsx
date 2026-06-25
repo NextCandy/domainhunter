@@ -63,14 +63,16 @@ const RISKS = [
 ];
 
 export function FilterPanel({
-  filters, onChange, onSearch, onBatchScan, batchScanning,
+  filters, onChange, onSearch, onBatchScan, batchScanning, tldOptions,
 }: {
   filters: DiscoverFilters;
   onChange: (next: DiscoverFilters) => void;
   onSearch?: () => void;
   onBatchScan?: () => void;
   batchScanning?: boolean;
+  tldOptions?: string[];
 }) {
+  const tldList = (tldOptions && tldOptions.length ? tldOptions : COMMON_TLDS);
   const [tldExpanded, setTldExpanded] = useState(false);
   const [tldQuery, setTldQuery] = useState("");
   const [customTld, setCustomTld] = useState("");
