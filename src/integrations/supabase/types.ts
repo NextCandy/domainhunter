@@ -71,6 +71,71 @@ export type Database = {
         }
         Relationships: []
       }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          discount_type: string
+          discount_value: number | null
+          id: number
+          notes: string | null
+          registrar_id: number | null
+          source_url: string | null
+          status: string
+          title: string | null
+          tlds: string[]
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+          verified: boolean
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number | null
+          id?: number
+          notes?: string | null
+          registrar_id?: number | null
+          source_url?: string | null
+          status?: string
+          title?: string | null
+          tlds?: string[]
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          verified?: boolean
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number | null
+          id?: number
+          notes?: string | null
+          registrar_id?: number | null
+          source_url?: string | null
+          status?: string
+          title?: string | null
+          tlds?: string[]
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_registrar_id_fkey"
+            columns: ["registrar_id"]
+            isOneToOne: false
+            referencedRelation: "registrars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_sources: {
         Row: {
           created_at: string
@@ -147,6 +212,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      domain_ideas: {
+        Row: {
+          created_at: string
+          id: number
+          keywords: string
+          params: Json
+          results: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          keywords: string
+          params?: Json
+          results?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          keywords?: string
+          params?: Json
+          results?: Json
+          user_id?: string
+        }
+        Relationships: []
       }
       domain_metrics: {
         Row: {
@@ -590,8 +682,63 @@ export type Database = {
         }
         Relationships: []
       }
+      registrar_prices: {
+        Row: {
+          api_supported: boolean
+          created_at: string
+          currency: string
+          id: number
+          notes: string | null
+          privacy_free: boolean
+          register_price: number | null
+          registrar_id: number
+          renew_price: number | null
+          tld: string
+          transfer_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          api_supported?: boolean
+          created_at?: string
+          currency?: string
+          id?: number
+          notes?: string | null
+          privacy_free?: boolean
+          register_price?: number | null
+          registrar_id: number
+          renew_price?: number | null
+          tld: string
+          transfer_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          api_supported?: boolean
+          created_at?: string
+          currency?: string
+          id?: number
+          notes?: string | null
+          privacy_free?: boolean
+          register_price?: number | null
+          registrar_id?: number
+          renew_price?: number | null
+          tld?: string
+          transfer_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registrar_prices_registrar_id_fkey"
+            columns: ["registrar_id"]
+            isOneToOne: false
+            referencedRelation: "registrars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registrars: {
         Row: {
+          api_base_url: string | null
+          api_enabled: boolean
           api_key_encrypted: string | null
           api_secret_encrypted: string | null
           buy_url_template: string | null
@@ -600,9 +747,15 @@ export type Database = {
           enabled: boolean
           id: number
           name: string
+          notes: string | null
+          slug: string | null
+          status: string
           updated_at: string
+          website: string | null
         }
         Insert: {
+          api_base_url?: string | null
+          api_enabled?: boolean
           api_key_encrypted?: string | null
           api_secret_encrypted?: string | null
           buy_url_template?: string | null
@@ -611,9 +764,15 @@ export type Database = {
           enabled?: boolean
           id?: number
           name: string
+          notes?: string | null
+          slug?: string | null
+          status?: string
           updated_at?: string
+          website?: string | null
         }
         Update: {
+          api_base_url?: string | null
+          api_enabled?: boolean
           api_key_encrypted?: string | null
           api_secret_encrypted?: string | null
           buy_url_template?: string | null
@@ -622,7 +781,11 @@ export type Database = {
           enabled?: boolean
           id?: number
           name?: string
+          notes?: string | null
+          slug?: string | null
+          status?: string
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
