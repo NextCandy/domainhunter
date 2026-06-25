@@ -156,16 +156,14 @@ export function DiscoverView({
     onError: (e: any) => toast.error(e?.message ?? "创建实时任务失败"),
   });
 
-  // 队列驱动：分批调用 runJobBatchFn，限速 + 进度
+  // 队列驱动：分批调用 runJobBatchFn，限速 + 进度（使用 strategyRef 的实时值）
   async function runQueue(jobId: string) {
-    const BATCH = 10;            // 单批并发请求
-    const PAUSE_MS = 600;        // 批间隔，避免被 RDAP 限流
     let consecutiveErrors = 0;
-    let waitMs = PAUSE_MS;
+    let waitMs = strategyRef.current.pauseMs;
     while (!pausedRef.current) {
+      const s = strategyRef.current;
       try {
-        const res: any = await runJobBatchFn({ data: { jobId, batchSize: BATCH, retries: 2, timeoutMs: 30_000 } });
-        // 拉取进度（保证 UI 数字准确）
+        const res: any = await runJobBatchFn({ data: { jobId, batchSize: s.batchSize, retries: s.maxRetries, timeoutMs: s.timeoutMs } });
         const p: any = await jobProgressFn({ data: { jobId } });
         const job = p.job;
         setProgress((prev) => prev && {
@@ -180,11 +178,11 @@ export function DiscoverView({
           break;
         }
         consecutiveErrors = 0;
-        waitMs = PAUSE_MS;
+        waitMs = s.pauseMs;
         await sleep(waitMs);
       } catch (e: any) {
         consecutiveErrors++;
-        waitMs = Math.min(8000, waitMs * 2); // 指数退避，避免持续被限流
+        waitMs = Math.min(8000, Math.max(waitMs, s.pauseMs) * 2);
         toast.error(`批次失败（${consecutiveErrors}）：${e?.message ?? "未知错误"}`);
         if (consecutiveErrors >= 5) {
           setProgress((prev) => prev && { ...prev, status: "error" });
@@ -194,6 +192,7 @@ export function DiscoverView({
       }
     }
   }
+
 
   const retryErrors = useMutation({
     mutationFn: () => requeueErrorsFn({ data: { jobId: progress!.jobId } }),
