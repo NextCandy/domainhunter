@@ -428,7 +428,7 @@ export interface JobEvent {
   level: "info" | "warning" | "error";
   event: string;
   message: string | null;
-  meta: Record<string, unknown> | null;
+  meta: any;
   created_at: string;
 }
 
