@@ -78,18 +78,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "AiPlay Mirror is a web application that replicates the functionality of a given website, allowing users to access and interact with its features." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "AiPlay Mirror is a web application that replicates the functionality of a given website, allowing users to access and interact with its features." },
+      { title: "DomainHunter — 过期域名发现 / 评分 / 观察工具" },
+      { name: "description", content: "DomainHunter 是一个自托管的过期域名发现、筛选、评分、观察与抢注辅助工具。支持高级筛选、规则化评分、批量 RDAP/WHOIS 检查与多注册商跳转。" },
+      { name: "author", content: "DomainHunter" },
+      { property: "og:title", content: "DomainHunter — 过期域名发现工具" },
+      { property: "og:description", content: "高级筛选 + 规则化评分 + 实时 RDAP，发现高价值过期域名。" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "AiPlay Mirror is a web application that replicates the functionality of a given website, allowing users to access and interact with its features." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/64c333f1-07f5-470b-926c-e255639dce08/id-preview-286d63bf--60ee246a-c816-4108-9ec3-3137b4bf9a46.lovable.app-1782366942768.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/64c333f1-07f5-470b-926c-e255639dce08/id-preview-286d63bf--60ee246a-c816-4108-9ec3-3137b4bf9a46.lovable.app-1782366942768.png" },
+      { name: "twitter:title", content: "DomainHunter" },
+      { name: "twitter:description", content: "高级筛选 + 规则化评分 + 实时 RDAP。" },
     ],
     links: [
       {
@@ -123,9 +120,8 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
-      <Toaster theme="dark" position="top-right" richColors closeButton />
+      <Toaster theme="light" position="top-right" richColors closeButton />
     </QueryClientProvider>
   );
 }

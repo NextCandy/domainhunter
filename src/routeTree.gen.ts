@@ -9,13 +9,103 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WatchlistRouteImport } from './routes/watchlist'
+import { Route as PendingRouteImport } from './routes/pending'
+import { Route as MyDomainsRouteImport } from './routes/my-domains'
+import { Route as DiscoverRouteImport } from './routes/discover'
+import { Route as DeletedRouteImport } from './routes/deleted'
+import { Route as AuctionsRouteImport } from './routes/auctions'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
+import { Route as DomainsDomainRouteImport } from './routes/domains.$domain'
+import { Route as AdminSourcesRouteImport } from './routes/admin.sources'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminScoringRouteImport } from './routes/admin.scoring'
+import { Route as AdminRegistrarsRouteImport } from './routes/admin.registrars'
+import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
 
+const WatchlistRoute = WatchlistRouteImport.update({
+  id: '/watchlist',
+  path: '/watchlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PendingRoute = PendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyDomainsRoute = MyDomainsRouteImport.update({
+  id: '/my-domains',
+  path: '/my-domains',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiscoverRoute = DiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeletedRoute = DeletedRouteImport.update({
+  id: '/deleted',
+  path: '/deleted',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuctionsRoute = AuctionsRouteImport.update({
+  id: '/auctions',
+  path: '/auctions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const ToolsBatchRdapRoute = ToolsBatchRdapRouteImport.update({
+  id: '/tools/batch-rdap',
+  path: '/tools/batch-rdap',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DomainsDomainRoute = DomainsDomainRouteImport.update({
+  id: '/domains/$domain',
+  path: '/domains/$domain',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSourcesRoute = AdminSourcesRouteImport.update({
+  id: '/sources',
+  path: '/sources',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminScoringRoute = AdminScoringRouteImport.update({
+  id: '/scoring',
+  path: '/scoring',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminRegistrarsRoute = AdminRegistrarsRouteImport.update({
+  id: '/registrars',
+  path: '/registrars',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminJobsRoute = AdminJobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
+  getParentRoute: () => AdminRoute,
 } as any)
 const ApiPublicJobsJobIdDownloadRoute =
   ApiPublicJobsJobIdDownloadRouteImport.update({
@@ -26,38 +116,247 @@ const ApiPublicJobsJobIdDownloadRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/auctions': typeof AuctionsRoute
+  '/deleted': typeof DeletedRoute
+  '/discover': typeof DiscoverRoute
+  '/my-domains': typeof MyDomainsRoute
+  '/pending': typeof PendingRoute
+  '/watchlist': typeof WatchlistRoute
+  '/admin/jobs': typeof AdminJobsRoute
+  '/admin/registrars': typeof AdminRegistrarsRoute
+  '/admin/scoring': typeof AdminScoringRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/sources': typeof AdminSourcesRoute
+  '/domains/$domain': typeof DomainsDomainRoute
+  '/tools/batch-rdap': typeof ToolsBatchRdapRoute
+  '/admin/': typeof AdminIndexRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auctions': typeof AuctionsRoute
+  '/deleted': typeof DeletedRoute
+  '/discover': typeof DiscoverRoute
+  '/my-domains': typeof MyDomainsRoute
+  '/pending': typeof PendingRoute
+  '/watchlist': typeof WatchlistRoute
+  '/admin/jobs': typeof AdminJobsRoute
+  '/admin/registrars': typeof AdminRegistrarsRoute
+  '/admin/scoring': typeof AdminScoringRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/sources': typeof AdminSourcesRoute
+  '/domains/$domain': typeof DomainsDomainRoute
+  '/tools/batch-rdap': typeof ToolsBatchRdapRoute
+  '/admin': typeof AdminIndexRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/auctions': typeof AuctionsRoute
+  '/deleted': typeof DeletedRoute
+  '/discover': typeof DiscoverRoute
+  '/my-domains': typeof MyDomainsRoute
+  '/pending': typeof PendingRoute
+  '/watchlist': typeof WatchlistRoute
+  '/admin/jobs': typeof AdminJobsRoute
+  '/admin/registrars': typeof AdminRegistrarsRoute
+  '/admin/scoring': typeof AdminScoringRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/sources': typeof AdminSourcesRoute
+  '/domains/$domain': typeof DomainsDomainRoute
+  '/tools/batch-rdap': typeof ToolsBatchRdapRoute
+  '/admin/': typeof AdminIndexRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/public/jobs/$jobId/download'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/auctions'
+    | '/deleted'
+    | '/discover'
+    | '/my-domains'
+    | '/pending'
+    | '/watchlist'
+    | '/admin/jobs'
+    | '/admin/registrars'
+    | '/admin/scoring'
+    | '/admin/settings'
+    | '/admin/sources'
+    | '/domains/$domain'
+    | '/tools/batch-rdap'
+    | '/admin/'
+    | '/api/public/jobs/$jobId/download'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/public/jobs/$jobId/download'
-  id: '__root__' | '/' | '/api/public/jobs/$jobId/download'
+  to:
+    | '/'
+    | '/auctions'
+    | '/deleted'
+    | '/discover'
+    | '/my-domains'
+    | '/pending'
+    | '/watchlist'
+    | '/admin/jobs'
+    | '/admin/registrars'
+    | '/admin/scoring'
+    | '/admin/settings'
+    | '/admin/sources'
+    | '/domains/$domain'
+    | '/tools/batch-rdap'
+    | '/admin'
+    | '/api/public/jobs/$jobId/download'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/auctions'
+    | '/deleted'
+    | '/discover'
+    | '/my-domains'
+    | '/pending'
+    | '/watchlist'
+    | '/admin/jobs'
+    | '/admin/registrars'
+    | '/admin/scoring'
+    | '/admin/settings'
+    | '/admin/sources'
+    | '/domains/$domain'
+    | '/tools/batch-rdap'
+    | '/admin/'
+    | '/api/public/jobs/$jobId/download'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  AuctionsRoute: typeof AuctionsRoute
+  DeletedRoute: typeof DeletedRoute
+  DiscoverRoute: typeof DiscoverRoute
+  MyDomainsRoute: typeof MyDomainsRoute
+  PendingRoute: typeof PendingRoute
+  WatchlistRoute: typeof WatchlistRoute
+  DomainsDomainRoute: typeof DomainsDomainRoute
+  ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
   ApiPublicJobsJobIdDownloadRoute: typeof ApiPublicJobsJobIdDownloadRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/watchlist': {
+      id: '/watchlist'
+      path: '/watchlist'
+      fullPath: '/watchlist'
+      preLoaderRoute: typeof WatchlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pending': {
+      id: '/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-domains': {
+      id: '/my-domains'
+      path: '/my-domains'
+      fullPath: '/my-domains'
+      preLoaderRoute: typeof MyDomainsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/discover': {
+      id: '/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof DiscoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deleted': {
+      id: '/deleted'
+      path: '/deleted'
+      fullPath: '/deleted'
+      preLoaderRoute: typeof DeletedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auctions': {
+      id: '/auctions'
+      path: '/auctions'
+      fullPath: '/auctions'
+      preLoaderRoute: typeof AuctionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/tools/batch-rdap': {
+      id: '/tools/batch-rdap'
+      path: '/tools/batch-rdap'
+      fullPath: '/tools/batch-rdap'
+      preLoaderRoute: typeof ToolsBatchRdapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/domains/$domain': {
+      id: '/domains/$domain'
+      path: '/domains/$domain'
+      fullPath: '/domains/$domain'
+      preLoaderRoute: typeof DomainsDomainRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/sources': {
+      id: '/admin/sources'
+      path: '/sources'
+      fullPath: '/admin/sources'
+      preLoaderRoute: typeof AdminSourcesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/scoring': {
+      id: '/admin/scoring'
+      path: '/scoring'
+      fullPath: '/admin/scoring'
+      preLoaderRoute: typeof AdminScoringRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/registrars': {
+      id: '/admin/registrars'
+      path: '/registrars'
+      fullPath: '/admin/registrars'
+      preLoaderRoute: typeof AdminRegistrarsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/jobs': {
+      id: '/admin/jobs'
+      path: '/jobs'
+      fullPath: '/admin/jobs'
+      preLoaderRoute: typeof AdminJobsRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/api/public/jobs/$jobId/download': {
       id: '/api/public/jobs/$jobId/download'
@@ -69,8 +368,37 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminJobsRoute: typeof AdminJobsRoute
+  AdminRegistrarsRoute: typeof AdminRegistrarsRoute
+  AdminScoringRoute: typeof AdminScoringRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSourcesRoute: typeof AdminSourcesRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminJobsRoute: AdminJobsRoute,
+  AdminRegistrarsRoute: AdminRegistrarsRoute,
+  AdminScoringRoute: AdminScoringRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminSourcesRoute: AdminSourcesRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  AuctionsRoute: AuctionsRoute,
+  DeletedRoute: DeletedRoute,
+  DiscoverRoute: DiscoverRoute,
+  MyDomainsRoute: MyDomainsRoute,
+  PendingRoute: PendingRoute,
+  WatchlistRoute: WatchlistRoute,
+  DomainsDomainRoute: DomainsDomainRoute,
+  ToolsBatchRdapRoute: ToolsBatchRdapRoute,
   ApiPublicJobsJobIdDownloadRoute: ApiPublicJobsJobIdDownloadRoute,
 }
 export const routeTree = rootRouteImport
