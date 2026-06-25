@@ -7,6 +7,7 @@ const NAV = [
   { to: "/", label: "概览" },
   { to: "/ideas", label: "域名灵感" },
   { to: "/discover", label: "发现域名" },
+  { to: "/pricing", label: "价格对比" },
   { to: "/deleted", label: "已删除" },
   { to: "/pending", label: "待删除" },
   { to: "/auctions", label: "拍卖" },
