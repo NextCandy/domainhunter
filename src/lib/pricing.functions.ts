@@ -314,14 +314,17 @@ export const recordPurchaseFn = createServerFn({ method: "POST" })
         renew_reminder: true,
       });
     }
-    // Trigger enrichment job (DNS + Archive + SEO) so the new domain shows up enriched.
+    // Best-effort: queue an enrich job. Schema for enrich_jobs varies; failure is non-fatal.
     try {
       await s.from("enrich_jobs").insert({
         status: "queued",
-        scope: "manual",
-        targets: [domain],
+        scope: "purchase",
+        kinds: ["dns", "archive", "seo"],
         total: 1,
+        name: `purchase:${domain}`,
       } as any);
-    } catch { /* table may have differing columns; non-fatal */ }
+      await s.from("enrich_items").insert({ domain, status: "queued" } as any);
+    } catch { /* non-fatal */ }
     return { ok: true, domain };
   });
+
