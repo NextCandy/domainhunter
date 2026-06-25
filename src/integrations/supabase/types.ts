@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      job_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: number
+          job_id: string
+          level: string
+          message: string | null
+          meta: Json | null
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: number
+          job_id: string
+          level?: string
+          message?: string | null
+          meta?: Json | null
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: number
+          job_id?: string
+          level?: string
+          message?: string | null
+          meta?: Json | null
+        }
+        Relationships: []
+      }
       job_items: {
         Row: {
           checked_at: string | null

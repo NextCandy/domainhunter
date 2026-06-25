@@ -4,6 +4,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import {
   lookupDomainFn,
   fetchTldsFn,
@@ -14,6 +15,9 @@ import {
   recentItemsFn,
   getJobFn,
   listRecentJobsFn,
+  listJobEventsFn,
+  LIMITS,
+  type JobEvent,
 } from "@/lib/rdap.functions";
 import type { DomainInfo } from "@/lib/rdap.server";
 import {
@@ -246,13 +250,13 @@ function NewTask() {
   const [listInput, setListInput] = useState("");
 
   const [taskName, setTaskName] = useState(() => defaultTaskName());
-  const [qps, setQps] = useState(5);
-  const [concurrency, setConcurrency] = useState(20);
-  const [perHostQps, setPerHostQps] = useState(10);
-  const [limit, setLimit] = useState(0);
-  const [maxTotal, setMaxTotal] = useState(1_000_000);
-  const [timeout, setTimeout] = useState(30);
-  const [retries, setRetries] = useState(2);
+  const [qps, setQps] = useState<number>(LIMITS.qps.default);
+  const [concurrency, setConcurrency] = useState<number>(LIMITS.concurrency.default);
+  const [perHostQps, setPerHostQps] = useState<number>(LIMITS.perHostQps.default);
+  const [limit, setLimit] = useState<number>(LIMITS.limit.default);
+  const [maxTotal, setMaxTotal] = useState<number>(LIMITS.maxTotal.default);
+  const [timeout, setTimeout] = useState<number>(LIMITS.timeoutSec.default);
+  const [retries, setRetries] = useState<number>(LIMITS.retries.default);
 
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -319,8 +323,38 @@ function NewTask() {
     }
   }
 
+  function validateParams(): string | null {
+    const checks: Array<[string, number, { min: number; max: number }]> = [
+      ["总 QPS", qps, LIMITS.qps],
+      ["并发数", concurrency, LIMITS.concurrency],
+      ["单主机 QPS", perHostQps, LIMITS.perHostQps],
+      ["超时(秒)", timeout, LIMITS.timeoutSec],
+      ["重试", retries, LIMITS.retries],
+    ];
+    for (const [label, v, b] of checks) {
+      if (!Number.isFinite(v) || v < b.min || v > b.max) {
+        return `${label} 需在 ${b.min}–${b.max} 之间（当前 ${v}）`;
+      }
+    }
+    if (limit < LIMITS.limit.min || limit > LIMITS.limit.max) {
+      return `测试 limit 需在 ${LIMITS.limit.min}–${LIMITS.limit.max.toLocaleString()} 之间`;
+    }
+    if (maxTotal < LIMITS.maxTotal.min || maxTotal > LIMITS.maxTotal.max) {
+      return `安全上限 max_total 需在 ${LIMITS.maxTotal.min}–${LIMITS.maxTotal.max.toLocaleString()} 之间`;
+    }
+    if (!taskName.trim()) return "任务名不能为空";
+    if (taskName.length > LIMITS.jobNameMax) return `任务名最长 ${LIMITS.jobNameMax} 字符`;
+    return null;
+  }
+
   async function startTask() {
     setError(null);
+    const paramErr = validateParams();
+    if (paramErr) {
+      setError(paramErr);
+      toast.error("参数校验未通过", { description: paramErr });
+      return;
+    }
     setCreating(true);
     try {
       const tlds = await resolveTlds();
@@ -351,37 +385,32 @@ function NewTask() {
       }
 
       if (all.size === 0) throw new Error("没有可用候选");
+      if (all.size > LIMITS.domainsPerJob.max) {
+        throw new Error(
+          `候选数量 ${all.size.toLocaleString()} 超过单任务上限 ${LIMITS.domainsPerJob.max.toLocaleString()}，请调整过滤或减少后缀`,
+        );
+      }
       if (maxTotal > 0 && all.size > maxTotal) {
         throw new Error(`数量 ${all.size} 超过安全上限 ${maxTotal}`);
       }
 
       const params = {
-        format,
-        customPattern,
-        filterType,
-        filterValue,
-        mustLetter,
-        mustDigit,
-        tldSource,
-        customTlds,
-        tldLength,
-        qps,
-        concurrency,
-        perHostQps,
-        limit,
-        maxTotal,
-        timeout,
-        retries,
+        format, customPattern, filterType, filterValue, mustLetter, mustDigit,
+        tldSource, customTlds, tldLength,
+        qps, concurrency, perHostQps, limit, maxTotal, timeout, retries,
       };
       const res = (await create({
-        data: { name: taskName || defaultTaskName(), params, domains: [...all] },
+        data: { name: taskName.trim() || defaultTaskName(), params, domains: [...all] },
       })) as { jobId: string };
 
       localStorage.setItem(LAST_JOB_KEY, res.jobId);
       window.dispatchEvent(new CustomEvent("ym:new-job", { detail: { jobId: res.jobId } }));
       setEstimate(null);
+      toast.success("任务已创建", { description: `共 ${all.size.toLocaleString()} 个候选域名` });
     } catch (e: any) {
-      setError(e?.message || "创建失败");
+      const msg = e?.message || "创建失败";
+      setError(msg);
+      toast.error("创建任务失败", { description: msg });
     } finally {
       setCreating(false);
     }
@@ -544,33 +573,38 @@ function NewTask() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <NumField label="总 QPS" value={qps} setValue={setQps} hint="默认 5" />
-            <NumField label="并发数" value={concurrency} setValue={setConcurrency} hint="默认 20" />
-            <NumField label="单主机 QPS" value={perHostQps} setValue={setPerHostQps} hint="默认 10" />
-            <NumField label="测试 limit" value={limit} setValue={setLimit} hint="0=全量" />
+            <NumField label="总 QPS" value={qps} setValue={setQps} bounds={LIMITS.qps} />
+            <NumField label="并发数" value={concurrency} setValue={setConcurrency} bounds={LIMITS.concurrency} />
+            <NumField label="单主机 QPS" value={perHostQps} setValue={setPerHostQps} bounds={LIMITS.perHostQps} />
+            <NumField label="测试 limit" value={limit} setValue={setLimit} bounds={LIMITS.limit} hint="0=全量" />
             <NumField
               label="安全上限 max_total"
               value={maxTotal}
               setValue={setMaxTotal}
+              bounds={LIMITS.maxTotal}
               hint="0=不限制"
             />
             <div className="grid grid-cols-2 gap-2">
-              <NumField label="超时(秒)" value={timeout} setValue={setTimeout} hint="默认 30" />
-              <NumField label="重试" value={retries} setValue={setRetries} hint="默认 2" />
+              <NumField label="超时(秒)" value={timeout} setValue={setTimeout} bounds={LIMITS.timeoutSec} />
+              <NumField label="重试" value={retries} setValue={setRetries} bounds={LIMITS.retries} />
             </div>
           </div>
         </div>
       </div>
 
       <div className="mt-5 pt-5 border-t border-border flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs">
           {estimate && (
-            <span className="mono">
+            <span className="mono text-muted-foreground">
               估算 ≈ <span className="text-foreground">{estimate.total.toLocaleString()}</span> 个域名
               {estimate.capped ? " (估算)" : ""}
             </span>
           )}
-          {error && <span className="text-destructive ml-3">{error}</span>}
+          {error && (
+            <div className="mt-1.5 text-destructive border border-destructive/40 bg-destructive/10 rounded px-2 py-1 inline-block">
+              ⚠ {error}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={doEstimate} className="btn-base btn-ghost" type="button">
@@ -599,22 +633,48 @@ function NumField({
   value,
   setValue,
   hint,
+  bounds,
 }: {
   label: string;
   value: number;
   setValue: (v: number) => void;
   hint?: string;
+  bounds?: { readonly min: number; readonly max: number };
 }) {
+  const oob =
+    bounds != null && (value < bounds.min || value > bounds.max);
   return (
     <label className="block">
-      <div className="text-[11px] text-muted-foreground mb-1">{label}</div>
+      <div className="text-[11px] text-muted-foreground mb-1 flex items-baseline justify-between gap-2">
+        <span>{label}</span>
+        {bounds && (
+          <span className="mono text-[10px] text-muted-foreground/70">
+            {bounds.min}–{bounds.max.toLocaleString()}
+          </span>
+        )}
+      </div>
       <input
         className="field"
         type="number"
+        min={bounds?.min}
+        max={bounds?.max}
         value={value}
         onChange={(e) => setValue(Number(e.target.value) || 0)}
+        onBlur={(e) => {
+          if (!bounds) return;
+          const n = Number(e.target.value) || 0;
+          const clamped = Math.min(bounds.max, Math.max(bounds.min, n));
+          if (clamped !== n) setValue(clamped);
+        }}
+        style={oob ? { borderColor: "var(--destructive)" } : undefined}
       />
-      {hint && <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>}
+      {oob && bounds ? (
+        <div className="text-[10px] text-destructive mt-0.5">
+          需在 {bounds.min}–{bounds.max.toLocaleString()} 之间
+        </div>
+      ) : hint ? (
+        <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>
+      ) : null}
     </label>
   );
 }
@@ -730,14 +790,16 @@ function CurrentTask() {
                 retries: Math.max(0, params.retries ?? 1),
               },
             });
-          } catch (err) {
+          } catch (err: any) {
+            const msg = err?.message || String(err) || "批次执行失败";
             console.error("batch error", err);
+            toast.error("批次执行失败", { description: msg, id: "batch-err" });
             await new Promise((r) => setTimeout(r, 1500));
           } finally {
             running = false;
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("poll error", err);
       }
     }
@@ -805,15 +867,35 @@ function CurrentTask() {
             <a className="btn-base btn-ghost" href={`${baseUrl}?kind=errors`}>
               errors.txt
             </a>
+            <a className="btn-base btn-ghost" href={`${baseUrl}?kind=events`}>
+              audit_log.tsv
+            </a>
+            <a className="btn-base btn-ghost" href={`${baseUrl}?kind=error-report`}>
+              error_report.json
+            </a>
             <button
               className="btn-base btn-ghost"
-              onClick={() => requeueErrors({ data: { jobId: job.id } })}
+              onClick={async () => {
+                try {
+                  const r = (await requeueErrors({ data: { jobId: job.id } })) as { requeued: number };
+                  toast.success(`已重新排队 ${r.requeued} 个错误项`);
+                } catch (e: any) {
+                  toast.error("补扫错误项失败", { description: e?.message });
+                }
+              }}
             >
               补扫错误项
             </button>
             <button
               className="btn-base btn-danger"
-              onClick={() => stopJob({ data: { jobId: job.id } })}
+              onClick={async () => {
+                try {
+                  await stopJob({ data: { jobId: job.id } });
+                  toast.warning("已请求停止任务");
+                } catch (e: any) {
+                  toast.error("停止任务失败", { description: e?.message });
+                }
+              }}
             >
               停止任务
             </button>
@@ -861,6 +943,9 @@ function CurrentTask() {
           emptyText="暂无"
         />
       </div>
+
+      <AuditLogPanel jobId={job.id} />
+
 
       {recentJobs.length > 1 && (
         <section className="panel p-5 sm:p-6">
@@ -964,6 +1049,109 @@ function RecentJobsList({
         </button>
       ))}
     </div>
+  );
+}
+
+/* ============================== AUDIT LOG ============================== */
+
+function AuditLogPanel({ jobId }: { jobId: string }) {
+  const listEvents = useServerFn(listJobEventsFn);
+  const [level, setLevel] = useState<"all" | "info" | "warning" | "error">("all");
+  const [events, setEvents] = useState<JobEvent[]>([]);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const rows = (await listEvents({
+          data: { jobId, level, limit: 100 },
+        })) as JobEvent[];
+        if (!cancelled) {
+          setEvents(rows || []);
+          setLoadErr(null);
+        }
+      } catch (e: any) {
+        if (!cancelled) setLoadErr(e?.message || "加载审计日志失败");
+      }
+    }
+    load();
+    const id = window.setInterval(load, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [jobId, level, listEvents]);
+
+  const levelTone: Record<string, string> = {
+    info: "text-muted-foreground border-border",
+    warning: "text-warning border-warning/40 bg-warning/10",
+    error: "text-destructive border-destructive/40 bg-destructive/10",
+  };
+
+  return (
+    <section className="panel p-5 sm:p-6">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap mb-4">
+        <div>
+          <h3 className="text-base font-semibold tracking-tight">审计日志 / Audit Log</h3>
+          <p className="text-[11px] text-muted-foreground mono mt-0.5">
+            状态变更与错误原因归档 · 每 3 秒自动刷新
+          </p>
+        </div>
+        <div className="flex gap-1.5">
+          {(["all", "info", "warning", "error"] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setLevel(k)}
+              className={`btn-base ${level === k ? "btn-primary" : "btn-ghost"}`}
+              style={{ padding: "0.25rem 0.625rem", fontSize: "0.7rem" }}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+      </div>
+      {loadErr && (
+        <div className="text-xs text-destructive border border-destructive/40 bg-destructive/10 rounded px-2 py-1 mb-3">
+          ⚠ {loadErr}
+        </div>
+      )}
+      <div className="panel-inset max-h-72 overflow-auto divide-y divide-border">
+        {events.length === 0 && !loadErr && (
+          <div className="text-xs text-muted-foreground p-3">暂无事件</div>
+        )}
+        {events.map((ev) => (
+          <div key={ev.id} className="p-2.5 text-xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="mono text-[11px] text-muted-foreground shrink-0">
+                {new Date(ev.created_at).toLocaleTimeString()}
+              </span>
+              <span className={`chip ${levelTone[ev.level] || ""}`}>{ev.level}</span>
+              <span className="mono text-foreground">{ev.event}</span>
+              {ev.message && (
+                <span className="text-muted-foreground truncate">{ev.message}</span>
+              )}
+              {ev.meta && (
+                <button
+                  type="button"
+                  className="ml-auto text-[10px] text-primary hover:underline"
+                  onClick={() => setExpanded(expanded === ev.id ? null : ev.id)}
+                >
+                  {expanded === ev.id ? "收起" : "详情"}
+                </button>
+              )}
+            </div>
+            {expanded === ev.id && ev.meta && (
+              <pre className="mt-2 mono text-[11px] p-2 bg-surface-2 rounded border border-border overflow-auto max-h-48">
+                {JSON.stringify(ev.meta, null, 2)}
+              </pre>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
