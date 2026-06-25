@@ -272,6 +272,68 @@ export function DiscoverView({
         </div>
       </div>
 
+      {/* RDAP 连通性 / 限流测试 */}
+      <div className="card-elev mb-4 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">RDAP 连通性测试</span>
+          <input
+            value={pingDomain}
+            onChange={(e) => setPingDomain(e.target.value.trim().toLowerCase())}
+            onKeyDown={(e) => { if (e.key === "Enter" && pingDomain) pingTest.mutate(pingDomain); }}
+            placeholder="example.com"
+            className="field flex-1 min-w-[200px]"
+          />
+          <button type="button" disabled={!pingDomain || pingTest.isPending}
+            onClick={() => pingTest.mutate(pingDomain)}
+            className="btn-base btn-primary">
+            {pingTest.isPending ? "测试中…" : "测试连通性"}
+          </button>
+          {pingResult && (
+            <div className="w-full text-xs font-mono mt-2 break-all">
+              <span className={`mr-2 rounded px-1.5 py-0.5 font-semibold ${
+                pingResult.rateLimited ? "bg-rose-500/15 text-rose-700 dark:text-rose-300" :
+                pingResult.ok ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
+                "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+              }`}>
+                {pingResult.rateLimited ? "已被限流" : pingResult.ok ? "连通正常" : "异常"}
+              </span>
+              <span className="text-muted-foreground">
+                状态: {pingResult.status} · 延迟: {pingResult.latencyMs}ms
+                {pingResult.source && <> · 来源: {pingResult.source}</>}
+                {pingResult.error && <span className="text-rose-600"> · {pingResult.error}</span>}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 扫描策略 (实时生效) */}
+      <div className="card-elev mb-4 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">扫描策略</span>
+          <span className="ml-auto text-xs text-muted-foreground">
+            当前: {strategy.batchSize}/批 · {strategy.pauseMs}ms 间隔 · 重试 {strategy.maxRetries} · 超时 {strategy.timeoutMs}ms · 理论速率 ~{(strategy.batchSize * 1000 / (strategy.pauseMs + 50)).toFixed(1)}/s
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          <StratNum label="每批数量" min={1} max={50} value={strategy.batchSize}
+            onChange={(v) => setStrategy(s => ({ ...s, batchSize: v }))} />
+          <StratNum label="批间隔 (ms)" min={100} max={10000} step={100} value={strategy.pauseMs}
+            onChange={(v) => setStrategy(s => ({ ...s, pauseMs: v }))} />
+          <StratNum label="最大重试" min={0} max={5} value={strategy.maxRetries}
+            onChange={(v) => setStrategy(s => ({ ...s, maxRetries: v }))} />
+          <StratNum label="超时 (ms)" min={5000} max={60000} step={1000} value={strategy.timeoutMs}
+            onChange={(v) => setStrategy(s => ({ ...s, timeoutMs: v }))} />
+        </div>
+        {progress && (
+          <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+            调整将在下一个批次生效（当前任务正在运行）
+          </div>
+        )}
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="card-elev hidden h-fit p-4 lg:block">
           <FilterPanel filters={filters} onChange={setFilters} onSearch={() => refetch()}
