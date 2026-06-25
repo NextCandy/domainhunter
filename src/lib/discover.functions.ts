@@ -170,7 +170,7 @@ async function refreshOneInternal(domain: string) {
     lookup.status === "available" ? "available" :
     lookup.status === "registered" ? "registered" :
     lookup.status === "unsupported" ? "unsupported" : "unknown";
-  const info: any = (lookup as any).info ?? {};
+  const info: any = lookup;
   const sc = scoreDomain({
     name: parsed.name, tld: parsed.tld,
     risk_level: "low",
@@ -180,16 +180,16 @@ async function refreshOneInternal(domain: string) {
     length: parsed.name.length, type: classifyDomain(parsed.name),
     status, score: sc.total, risk_level: "low",
     last_checked_at: new Date().toISOString(),
-    expiry_date: info?.expiry ?? null,
+    expiry_date: info?.expiresDate ?? null,
   }, { onConflict: "domain" }).select("id").maybeSingle();
   if (upErr) throw new Error(upErr.message);
   if (domRow && status === "registered") {
     await sb.from("domain_whois").upsert({
       domain_id: domRow.id,
       registrar: info?.registrar ?? null,
-      created_date: info?.created ?? null,
-      expiry_date: info?.expiry ?? null,
-      updated_date: info?.updated ?? null,
+      created_date: info?.createdDate ?? null,
+      expiry_date: info?.expiresDate ?? null,
+      updated_date: info?.updatedDate ?? null,
       nameservers: info?.nameservers ?? null,
       raw_data: info,
       checked_at: new Date().toISOString(),
