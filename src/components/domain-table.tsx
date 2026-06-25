@@ -204,13 +204,14 @@ export function FilterPanel({
           </div>
           <div className="text-[11px] text-muted-foreground">支持逗号/空格/换行分隔的批量后缀，已自动去重</div>
         </div>
-        {onSearch && (
-          <button type="button" onClick={runBatchSearch}
+        {(onSearch || onBatchScan) && (
+          <button type="button" onClick={runBatchSearch} disabled={batchScanning}
             className="btn-base btn-primary mt-3 w-full">
-            批量查询{filters.tlds?.length ? `（${filters.tlds.length} 个 TLD）` : ""}
+            {batchScanning ? "实时查询中…" : `批量查询${filters.tlds?.length ? `（${filters.tlds.length} 个 TLD）` : ""}`}
           </button>
         )}
       </Section>
+
 
       <Section title="状态">
         <div className="flex flex-wrap gap-1.5">
