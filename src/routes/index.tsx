@@ -323,8 +323,38 @@ function NewTask() {
     }
   }
 
+  function validateParams(): string | null {
+    const checks: Array<[string, number, { min: number; max: number }]> = [
+      ["总 QPS", qps, LIMITS.qps],
+      ["并发数", concurrency, LIMITS.concurrency],
+      ["单主机 QPS", perHostQps, LIMITS.perHostQps],
+      ["超时(秒)", timeout, LIMITS.timeoutSec],
+      ["重试", retries, LIMITS.retries],
+    ];
+    for (const [label, v, b] of checks) {
+      if (!Number.isFinite(v) || v < b.min || v > b.max) {
+        return `${label} 需在 ${b.min}–${b.max} 之间（当前 ${v}）`;
+      }
+    }
+    if (limit < LIMITS.limit.min || limit > LIMITS.limit.max) {
+      return `测试 limit 需在 ${LIMITS.limit.min}–${LIMITS.limit.max.toLocaleString()} 之间`;
+    }
+    if (maxTotal < LIMITS.maxTotal.min || maxTotal > LIMITS.maxTotal.max) {
+      return `安全上限 max_total 需在 ${LIMITS.maxTotal.min}–${LIMITS.maxTotal.max.toLocaleString()} 之间`;
+    }
+    if (!taskName.trim()) return "任务名不能为空";
+    if (taskName.length > LIMITS.jobNameMax) return `任务名最长 ${LIMITS.jobNameMax} 字符`;
+    return null;
+  }
+
   async function startTask() {
     setError(null);
+    const paramErr = validateParams();
+    if (paramErr) {
+      setError(paramErr);
+      toast.error("参数校验未通过", { description: paramErr });
+      return;
+    }
     setCreating(true);
     try {
       const tlds = await resolveTlds();
@@ -355,37 +385,32 @@ function NewTask() {
       }
 
       if (all.size === 0) throw new Error("没有可用候选");
+      if (all.size > LIMITS.domainsPerJob.max) {
+        throw new Error(
+          `候选数量 ${all.size.toLocaleString()} 超过单任务上限 ${LIMITS.domainsPerJob.max.toLocaleString()}，请调整过滤或减少后缀`,
+        );
+      }
       if (maxTotal > 0 && all.size > maxTotal) {
         throw new Error(`数量 ${all.size} 超过安全上限 ${maxTotal}`);
       }
 
       const params = {
-        format,
-        customPattern,
-        filterType,
-        filterValue,
-        mustLetter,
-        mustDigit,
-        tldSource,
-        customTlds,
-        tldLength,
-        qps,
-        concurrency,
-        perHostQps,
-        limit,
-        maxTotal,
-        timeout,
-        retries,
+        format, customPattern, filterType, filterValue, mustLetter, mustDigit,
+        tldSource, customTlds, tldLength,
+        qps, concurrency, perHostQps, limit, maxTotal, timeout, retries,
       };
       const res = (await create({
-        data: { name: taskName || defaultTaskName(), params, domains: [...all] },
+        data: { name: taskName.trim() || defaultTaskName(), params, domains: [...all] },
       })) as { jobId: string };
 
       localStorage.setItem(LAST_JOB_KEY, res.jobId);
       window.dispatchEvent(new CustomEvent("ym:new-job", { detail: { jobId: res.jobId } }));
       setEstimate(null);
+      toast.success("任务已创建", { description: `共 ${all.size.toLocaleString()} 个候选域名` });
     } catch (e: any) {
-      setError(e?.message || "创建失败");
+      const msg = e?.message || "创建失败";
+      setError(msg);
+      toast.error("创建任务失败", { description: msg });
     } finally {
       setCreating(false);
     }
