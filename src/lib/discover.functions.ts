@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { scoreDomain, classifyDomain, DEFAULT_WEIGHTS, type ScoringWeights } from "./scoring";
-import { performLookup } from "./rdap.server";
+import { lookupDomain } from "./rdap.server";
 
 function sbAdmin() {
   return createClient<Database>(
