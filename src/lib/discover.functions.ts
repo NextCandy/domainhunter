@@ -516,7 +516,7 @@ export const enrichDomainFn = createServerFn({ method: "POST" })
       domain_id: dom.id,
       archive_year: arc.archive_year,
       archive_count: arc.archive_count,
-      checked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
     return { dns, archive: arc };
   });
