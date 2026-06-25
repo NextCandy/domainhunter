@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { scoreDomain, classifyDomain, DEFAULT_WEIGHTS, type ScoringWeights } from "./scoring";
 import { lookupDomain } from "./rdap.server";
+import { fetchDns, fetchArchive, sendNotification } from "./enrich.server";
 
 function sbAdmin() {
   return createClient<Database>(
