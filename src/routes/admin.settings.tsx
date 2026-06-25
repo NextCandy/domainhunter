@@ -66,7 +66,10 @@ function AdminSettings() {
           {F("notify_bark", "Bark URL", "https://api.day.app/xxx")}
           {F("notify_webhook", "Webhook URL", "https://...")}
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">本版本仅保存配置；实际通知发送将在后续接入。</p>
+        <div className="mt-3 flex items-center gap-2">
+          <button onClick={() => testNotify.mutate()} disabled={testNotify.isPending || (!form.notify_bark && !form.notify_webhook)} className="btn-base btn-ghost"><Send className="h-4 w-4" />{testNotify.isPending ? "发送中…" : "发送测试通知"}</button>
+          <p className="text-[11px] text-muted-foreground">支持 Bark / 通用 Webhook（POST JSON）。邮件 / Telegram 将在后续接入。</p>
+        </div>
       </section>
       <div className="lg:col-span-2">
         <button onClick={() => save.mutate()} disabled={save.isPending} className="btn-base btn-primary">{save.isPending ? "保存中…" : "保存全部设置"}</button>
