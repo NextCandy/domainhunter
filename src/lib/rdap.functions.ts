@@ -190,9 +190,11 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
     }
 
     const wasRunning = (job as any).status === "running";
-    const updates: Record<string, any> = { status: "running" };
-    if (!(job as any).started_at) updates.started_at = new Date().toISOString();
-    await supabaseAdmin.from("jobs").update(updates).eq("id", data.jobId);
+    const startedAt = (job as any).started_at ?? new Date().toISOString();
+    await supabaseAdmin
+      .from("jobs")
+      .update({ status: "running", started_at: startedAt })
+      .eq("id", data.jobId);
     if (!wasRunning) {
       await logEvent(data.jobId, "started", { message: "任务开始执行" });
     }
