@@ -493,3 +493,47 @@ export const saveSettingsFn = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+// ───────── Stage 4: DNS + Wayback enrichment ─────────
+export const enrichDomainFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ domain: z.string().min(3).max(253) }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = sbAdmin();
+    const parsed = parseDomain(data.domain);
+    if (!parsed) throw new Error("Invalid domain");
+    const { data: dom } = await sb.from("domains").select("id").eq("domain", parsed.domain).maybeSingle();
+    if (!dom) throw new Error("先在数据库中创建该域名（点击「立即检测」）");
+    const [dns, arc] = await Promise.all([fetchDns(parsed.domain), fetchArchive(parsed.domain)]);
+    await sb.from("domain_dns").upsert({
+      domain_id: dom.id,
+      a_records: dns.a_records,
+      ns_records: dns.ns_records,
+      mx_records: dns.mx_records,
+      txt_records: dns.txt_records,
+      checked_at: new Date().toISOString(),
+    });
+    await sb.from("domain_metrics").upsert({
+      domain_id: dom.id,
+      archive_year: arc.archive_year,
+      archive_count: arc.archive_count,
+      checked_at: new Date().toISOString(),
+    });
+    return { dns, archive: arc };
+  });
+
+// ───────── Stage 4: notification test ─────────
+export const sendTestNotificationFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({
+    bark: z.string().url().optional().or(z.literal("")),
+    webhook: z.string().url().optional().or(z.literal("")),
+    title: z.string().max(200).default("DomainHunter 测试通知"),
+    body: z.string().max(1000).default("如果你收到这条消息，说明通道配置正确。"),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const res = await sendNotification(
+      { bark: data.bark || undefined, webhook: data.webhook || undefined },
+      data.title, data.body,
+    );
+    if (!res.length) throw new Error("请先填写 Bark 或 Webhook URL");
+    return { results: res };
+  });
