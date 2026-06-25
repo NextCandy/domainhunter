@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Plus, Trash2, Save } from "lucide-react";
 import { toast } from "sonner";
-import { listPricesFn, upsertPriceFn, deletePriceFn, listCouponsFn, upsertCouponFn, deleteCouponFn } from "@/lib/pricing.functions";
+import { listPricesFn, upsertPriceFn, deletePriceFn, listCouponsFn, upsertCouponFn, deleteCouponFn, syncRegistrarPricesFn } from "@/lib/pricing.functions";
 import { listRegistrarsFn } from "@/lib/discover.functions";
 
 export const Route = createFileRoute("/admin/pricing")({
