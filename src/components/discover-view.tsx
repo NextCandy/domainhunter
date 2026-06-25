@@ -47,6 +47,45 @@ export function DiscoverView({
     onError: (e: any) => toast.error(e?.message ?? "刷新失败"),
   });
 
+  const nav = useNavigate();
+
+  const enrichOne = useMutation({
+    mutationFn: (d: DomainRow) =>
+      createEnrichJobFn({
+        data: {
+          name: `Enrich ${d.domain}`,
+          domains: [d.domain],
+          kinds: ["dns", "archive", "seo"],
+          scope: "single",
+        },
+      }),
+    onSuccess: (r) => {
+      toast.success("已创建丰富任务，跳转中…");
+      nav({ to: "/enrich/$id", params: { id: r.id } });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "创建丰富任务失败"),
+  });
+
+  const enrichBulk = useMutation({
+    mutationFn: () => {
+      const domains = (data?.rows ?? []).map((r: any) => r.domain).slice(0, 500);
+      if (!domains.length) throw new Error("当前结果为空");
+      return createEnrichJobFn({
+        data: {
+          name: `Enrich 当前结果 ${domains.length} 个`,
+          domains,
+          kinds: ["dns", "archive", "seo"],
+          scope: "discover",
+        },
+      });
+    },
+    onSuccess: (r) => {
+      toast.success(`已创建丰富任务（${r.total} 子任务），跳转中…`);
+      nav({ to: "/enrich/$id", params: { id: r.id } });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "创建丰富任务失败"),
+  });
+
   return (
     <AppShell>
       <PageHeader
@@ -54,6 +93,16 @@ export function DiscoverView({
         description={description ?? `命中 ${(data?.total ?? 0).toLocaleString()} 个域名${isFetching ? " · 加载中…" : ""}`}
         actions={
           <>
+            <button
+              type="button"
+              onClick={() => enrichBulk.mutate()}
+              disabled={enrichBulk.isPending || !(data?.rows ?? []).length}
+              className="btn-base btn-ghost"
+              title="为当前结果批量创建 DNS/Archive/SEO 丰富任务（最多 500 个）"
+            >
+              <Sparkles className="h-4 w-4" />
+              {enrichBulk.isPending ? "创建中…" : "一键丰富当前结果"}
+            </button>
             <button
               type="button"
               onClick={() => refetch()}
@@ -93,6 +142,7 @@ export function DiscoverView({
             onChange={setFilters}
             onWatch={(d) => watchMut.mutate(d)}
             onRefresh={(d) => refreshMut.mutate(d)}
+            onEnrich={(d) => enrichOne.mutate(d)}
           />
         </div>
       </div>
