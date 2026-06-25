@@ -1,7 +1,7 @@
 // Domain table + filter panel + mobile cards. Shared by /discover and its presets.
 import { Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import { Eye, ExternalLink, RefreshCw, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { Eye, ExternalLink, RefreshCw, Filter, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { ScoreBadge, StatusBadge, RiskBadge, EmptyState } from "./app-shell";
 import type { DiscoverFilters } from "@/lib/discover.functions";
 
@@ -237,7 +237,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function DomainTable({
-  rows, total, filters, onChange, onWatch, onRefresh,
+  rows, total, filters, onChange, onWatch, onRefresh, onEnrich,
 }: {
   rows: DomainRow[];
   total: number;
@@ -245,6 +245,7 @@ export function DomainTable({
   onChange: (next: DiscoverFilters) => void;
   onWatch?: (d: DomainRow) => void;
   onRefresh?: (d: DomainRow) => void;
+  onEnrich?: (d: DomainRow) => void;
 }) {
   const pages = Math.max(1, Math.ceil(total / filters.pageSize));
   const setSort = (col: DiscoverFilters["sortBy"]) => {
@@ -297,7 +298,8 @@ export function DomainTable({
                   <td className="px-3 py-2"><RiskBadge level={r.risk_level} /></td>
                   <td className="px-4 py-2 text-right">
                     <div className="inline-flex items-center gap-1">
-                      {onRefresh && <button type="button" onClick={() => onRefresh(r)} title="刷新" className="grid h-7 w-7 place-items-center rounded hover:bg-accent"><RefreshCw className="h-3.5 w-3.5" /></button>}
+                      {onRefresh && <button type="button" onClick={() => onRefresh(r)} title="RDAP 刷新" className="grid h-7 w-7 place-items-center rounded hover:bg-accent"><RefreshCw className="h-3.5 w-3.5" /></button>}
+                      {onEnrich && <button type="button" onClick={() => onEnrich(r)} title="一键丰富 DNS/Archive/SEO" className="grid h-7 w-7 place-items-center rounded text-primary hover:bg-primary/10"><Sparkles className="h-3.5 w-3.5" /></button>}
                       {onWatch && <button type="button" onClick={() => onWatch(r)} title="观察" className="grid h-7 w-7 place-items-center rounded hover:bg-accent"><Eye className="h-3.5 w-3.5" /></button>}
                       <a href={`https://www.namecheap.com/domains/registration/results/?domain=${r.domain}`} target="_blank" rel="noreferrer" title="注册" className="grid h-7 w-7 place-items-center rounded text-primary hover:bg-accent"><ExternalLink className="h-3.5 w-3.5" /></a>
                     </div>
@@ -330,6 +332,7 @@ export function DomainTable({
               <span>{formatDate(r.drop_date ?? r.expiry_date)}</span>
             </div>
             <div className="mt-2 flex gap-2">
+              {onEnrich && <button type="button" onClick={() => onEnrich(r)} className="btn-base btn-ghost flex-1 !py-1.5 text-xs"><Sparkles className="h-3 w-3" />丰富</button>}
               {onWatch && <button type="button" onClick={() => onWatch(r)} className="btn-base btn-ghost flex-1 !py-1.5 text-xs">观察</button>}
               <Link to="/domains/$domain" params={{ domain: r.domain }} className="btn-base btn-ghost flex-1 !py-1.5 text-xs">详情</Link>
               <a href={`https://www.namecheap.com/domains/registration/results/?domain=${r.domain}`} target="_blank" rel="noreferrer" className="btn-base btn-primary flex-1 !py-1.5 text-xs">注册</a>
