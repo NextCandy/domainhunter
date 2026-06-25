@@ -21,6 +21,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as DomainsDomainRouteImport } from './routes/domains.$domain'
 import { Route as AdminSourcesRouteImport } from './routes/admin.sources'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminScoringRouteImport } from './routes/admin.scoring'
 import { Route as AdminRegistrarsRouteImport } from './routes/admin.registrars'
 import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
@@ -86,6 +87,11 @@ const AdminSourcesRoute = AdminSourcesRouteImport.update({
   path: '/sources',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminScoringRoute = AdminScoringRouteImport.update({
   id: '/scoring',
   path: '/scoring',
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/admin/jobs': typeof AdminJobsRoute
   '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/admin/jobs'
     | '/admin/registrars'
     | '/admin/scoring'
+    | '/admin/settings'
     | '/admin/sources'
     | '/domains/$domain'
     | '/tools/batch-rdap'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/admin/jobs'
     | '/admin/registrars'
     | '/admin/scoring'
+    | '/admin/settings'
     | '/admin/sources'
     | '/domains/$domain'
     | '/tools/batch-rdap'
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/admin/jobs'
     | '/admin/registrars'
     | '/admin/scoring'
+    | '/admin/settings'
     | '/admin/sources'
     | '/domains/$domain'
     | '/tools/batch-rdap'
@@ -318,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSourcesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/scoring': {
       id: '/admin/scoring'
       path: '/scoring'
@@ -353,6 +372,7 @@ interface AdminRouteChildren {
   AdminJobsRoute: typeof AdminJobsRoute
   AdminRegistrarsRoute: typeof AdminRegistrarsRoute
   AdminScoringRoute: typeof AdminScoringRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSourcesRoute: typeof AdminSourcesRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -361,6 +381,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminJobsRoute: AdminJobsRoute,
   AdminRegistrarsRoute: AdminRegistrarsRoute,
   AdminScoringRoute: AdminScoringRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminSourcesRoute: AdminSourcesRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
