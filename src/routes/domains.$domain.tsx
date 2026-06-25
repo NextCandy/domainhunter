@@ -124,7 +124,7 @@ function DomainDetailPage() {
           <KV k="Archive 抓取" v={String(m?.archive_count ?? 0)} />
           <KV k="外链 BL" v={String(m?.backlinks ?? 0)} />
           <KV k="引用域名 DP" v={String(m?.referring_domains ?? 0)} />
-          <p className="mt-3 text-xs text-muted-foreground">外部 SEO/Archive API 接入将在后续版本提供。</p>
+          <p className="mt-3 text-xs text-muted-foreground">Archive 数据来自 Wayback Machine 公共 API。Ahrefs / Majestic 等外链数据需付费接入。</p>
         </Card>
 
         <Card title="相关后缀注册情况">
