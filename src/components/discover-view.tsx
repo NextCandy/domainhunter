@@ -376,7 +376,8 @@ export function DiscoverView({
             <FilterPanel filters={filters} onChange={setFilters}
               onSearch={() => { refetch(); setMobileFilters(false); }}
               onBatchScan={() => { liveScan.mutate(); setMobileFilters(false); }}
-              batchScanning={liveScan.isPending || !!progress} />
+              batchScanning={liveScan.isPending || !!progress}
+              tldOptions={tldData?.tlds} />
             <button onClick={() => setMobileFilters(false)} className="btn-base btn-primary mt-4 w-full">应用</button>
           </div>
         </div>
