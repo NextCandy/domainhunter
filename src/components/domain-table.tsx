@@ -186,10 +186,10 @@ export function FilterPanel({
               className="rounded-md border border-primary bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">.{t} ×</button>
           ))}
         </div>
-        {COMMON_TLDS.length > 18 && !tldQuery && (
+        {tldList.length > 18 && !tldQuery && (
           <button type="button" onClick={() => setTldExpanded(v => !v)}
             className="mt-2 text-xs text-primary hover:underline">
-            {tldExpanded ? "收起" : `展开全部 ${COMMON_TLDS.length} 个后缀 →`}
+            {tldExpanded ? "收起" : `展开全部 ${tldList.length} 个后缀 →`}
           </button>
         )}
         <div className="mt-2 space-y-1.5">
