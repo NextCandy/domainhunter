@@ -7,6 +7,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { scoreDomain, classifyDomain, DEFAULT_WEIGHTS, type ScoringWeights } from "./scoring";
 import { lookupDomain } from "./rdap.server";
 import { fetchDns, fetchArchive, sendNotification } from "./enrich.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAdmin } from "./admin-guard.server";
 
 function sbAdmin() {
   return createClient<Database>(
@@ -62,7 +64,7 @@ export const overviewStatsFn = createServerFn({ method: "GET" }).handler(async (
 // ───────── Discover (paginated, filterable) ─────────
 const DiscoverFilters = z.object({
   q: z.string().trim().max(200).optional(),
-  tlds: z.array(z.string().regex(/^[a-z0-9-]+$/i).max(20)).max(20).optional(),
+  tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).max(300).optional(),
   statuses: z.array(z.string().max(30)).max(8).optional(),
   types: z.array(z.string().max(20)).max(6).optional(),
   minLength: z.number().int().min(1).max(63).optional(),
@@ -540,7 +542,7 @@ export const sendTestNotificationFn = createServerFn({ method: "POST" })
 
 // ───────── Live batch scan (Discover 页「批量查询」实际触发) ─────────
 const LiveScanSchema = z.object({
-  tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).min(1).max(50),
+  tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).min(1).max(300),
   names: z.array(z.string().min(1).max(40)).max(200).optional(),
   q: z.string().max(40).optional(),
   startsWith: z.string().max(20).optional(),
@@ -602,5 +604,47 @@ export const liveScanFn = createServerFn({ method: "POST" })
       await sb.from("job_items").insert(items.slice(i, i + 500));
     }
     return { jobId, total: list.length };
+  });
+
+// ───────── 管理员可编辑的 TLD 列表（前端筛选区使用） ─────────
+const DEFAULT_TLD_LIST = [
+  "com","net","org","info","biz","pro","name","mobi",
+  "io","ai","co","app","dev","xyz","site","online","store","shop",
+  "tech","cloud","club","fun","icu","live","world","today","blog",
+  "design","studio","agency","media","news","art","vip","top",
+  "wiki","link","page","space","website",
+  "cn","com.cn","net.cn","cc","tv","me","us","uk","co.uk",
+  "de","jp","co.jp","kr","tw","hk","sg","in","ru","br",
+  "fr","it","es","nl","ca","au","com.au","nz","ch","se",
+  "no","fi","dk","pl","be","at","cz","ie","mx","ar",
+  "to","is","im","li","la","fm","gg","so","ws",
+];
+
+export const getTldListFn = createServerFn({ method: "GET" }).handler(async () => {
+  const sb = sbAdmin();
+  const { data } = await sb.from("app_settings").select("value").eq("key", "tld_list").maybeSingle();
+  const v = data?.value as unknown;
+  const list = Array.isArray(v)
+    ? (v as unknown[]).map(x => String(x).trim().toLowerCase().replace(/^\./, "")).filter(x => /^[a-z0-9.\-]+$/.test(x))
+    : DEFAULT_TLD_LIST;
+  return { tlds: Array.from(new Set(list)) };
+});
+
+export const saveTldListFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).max(1000),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const sb = sbAdmin();
+    const dedup = Array.from(new Set(
+      data.tlds.map(t => t.trim().toLowerCase().replace(/^\./, "")).filter(Boolean),
+    ));
+    const { error } = await sb.from("app_settings").upsert({
+      key: "tld_list", value: dedup as any, updated_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true, count: dedup.length };
   });
 

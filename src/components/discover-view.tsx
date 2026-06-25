@@ -5,7 +5,7 @@ import { Filter, RefreshCw, Search, Sparkles, X, Download, RotateCw, SkipForward
 import { useNavigate } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
-import { discoverFn, toggleWatchFn, refreshDomainFn, liveScanFn, type DiscoverFilters } from "@/lib/discover.functions";
+import { discoverFn, toggleWatchFn, refreshDomainFn, liveScanFn, getTldListFn, type DiscoverFilters } from "@/lib/discover.functions";
 import { createEnrichJobFn } from "@/lib/enrich-jobs.functions";
 import { lookupDomainFn, runJobBatchFn, requeueErrorsFn, jobProgressFn } from "@/lib/rdap.functions";
 import { toast } from "sonner";
@@ -100,6 +100,13 @@ export function DiscoverView({
     placeholderData: (prev) => prev,
   });
 
+  // 后台可配置的 TLD 列表
+  const { data: tldData } = useQuery({
+    queryKey: ["tld-list"],
+    queryFn: () => getTldListFn(),
+    staleTime: 60_000,
+  });
+
   const watchMut = useMutation({
     mutationFn: (d: DomainRow) => toggleWatchFn({ data: { domain: d.domain } }),
     onSuccess: (r) => toast.success(r.watching ? "已加入观察列表" : "已从观察列表移除"),
@@ -174,6 +181,8 @@ export function DiscoverView({
         });
         if (res?.remaining === 0 || res?.processed === 0 || job.status === "completed" || job.status === "stopped") {
           setProgress((prev) => prev && { ...prev, status: job.status === "stopped" ? "stopped" : "completed" });
+          // 清掉状态预设，让实时扫描得到的 available/registered 都能在列表里显示
+          setFilters((f) => ({ ...f, statuses: undefined, page: 1 }));
           refetch();
           break;
         }
@@ -337,7 +346,8 @@ export function DiscoverView({
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="card-elev hidden h-fit p-4 lg:block">
           <FilterPanel filters={filters} onChange={setFilters} onSearch={() => refetch()}
-            onBatchScan={() => liveScan.mutate()} batchScanning={liveScan.isPending || !!progress} />
+            onBatchScan={() => liveScan.mutate()} batchScanning={liveScan.isPending || !!progress}
+            tldOptions={tldData?.tlds} />
         </aside>
 
         <div className="min-w-0">
@@ -366,7 +376,8 @@ export function DiscoverView({
             <FilterPanel filters={filters} onChange={setFilters}
               onSearch={() => { refetch(); setMobileFilters(false); }}
               onBatchScan={() => { liveScan.mutate(); setMobileFilters(false); }}
-              batchScanning={liveScan.isPending || !!progress} />
+              batchScanning={liveScan.isPending || !!progress}
+              tldOptions={tldData?.tlds} />
             <button onClick={() => setMobileFilters(false)} className="btn-base btn-primary mt-4 w-full">应用</button>
           </div>
         </div>

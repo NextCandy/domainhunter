@@ -24,6 +24,7 @@ import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as EnrichIdRouteImport } from './routes/enrich.$id'
 import { Route as DomainsDomainRouteImport } from './routes/domains.$domain'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminTldsRouteImport } from './routes/admin.tlds'
 import { Route as AdminSourcesRouteImport } from './routes/admin.sources'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminScoringRouteImport } from './routes/admin.scoring'
@@ -108,6 +109,11 @@ const AdminUsersRoute = AdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTldsRoute = AdminTldsRouteImport.update({
+  id: '/tlds',
+  path: '/tlds',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminSourcesRoute = AdminSourcesRouteImport.update({
   id: '/sources',
   path: '/sources',
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
+  '/admin/tlds': typeof AdminTldsRoute
   '/admin/users': typeof AdminUsersRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/enrich/$id': typeof EnrichIdRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
+  '/admin/tlds': typeof AdminTldsRoute
   '/admin/users': typeof AdminUsersRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/enrich/$id': typeof EnrichIdRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/sources': typeof AdminSourcesRoute
+  '/admin/tlds': typeof AdminTldsRoute
   '/admin/users': typeof AdminUsersRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/enrich/$id': typeof EnrichIdRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/admin/scoring'
     | '/admin/settings'
     | '/admin/sources'
+    | '/admin/tlds'
     | '/admin/users'
     | '/domains/$domain'
     | '/enrich/$id'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/admin/scoring'
     | '/admin/settings'
     | '/admin/sources'
+    | '/admin/tlds'
     | '/admin/users'
     | '/domains/$domain'
     | '/enrich/$id'
@@ -294,6 +305,7 @@ export interface FileRouteTypes {
     | '/admin/scoring'
     | '/admin/settings'
     | '/admin/sources'
+    | '/admin/tlds'
     | '/admin/users'
     | '/domains/$domain'
     | '/enrich/$id'
@@ -427,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminUsersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/tlds': {
+      id: '/admin/tlds'
+      path: '/tlds'
+      fullPath: '/admin/tlds'
+      preLoaderRoute: typeof AdminTldsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/sources': {
       id: '/admin/sources'
       path: '/sources'
@@ -493,6 +512,7 @@ interface AdminRouteChildren {
   AdminScoringRoute: typeof AdminScoringRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminSourcesRoute: typeof AdminSourcesRoute
+  AdminTldsRoute: typeof AdminTldsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -504,6 +524,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminScoringRoute: AdminScoringRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminSourcesRoute: AdminSourcesRoute,
+  AdminTldsRoute: AdminTldsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

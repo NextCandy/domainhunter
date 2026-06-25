@@ -63,14 +63,16 @@ const RISKS = [
 ];
 
 export function FilterPanel({
-  filters, onChange, onSearch, onBatchScan, batchScanning,
+  filters, onChange, onSearch, onBatchScan, batchScanning, tldOptions,
 }: {
   filters: DiscoverFilters;
   onChange: (next: DiscoverFilters) => void;
   onSearch?: () => void;
   onBatchScan?: () => void;
   batchScanning?: boolean;
+  tldOptions?: string[];
 }) {
+  const tldList = (tldOptions && tldOptions.length ? tldOptions : COMMON_TLDS);
   const [tldExpanded, setTldExpanded] = useState(false);
   const [tldQuery, setTldQuery] = useState("");
   const [customTld, setCustomTld] = useState("");
@@ -94,9 +96,9 @@ export function FilterPanel({
     set("tlds", dedup.length ? dedup : undefined);
   };
 
-  const visibleTlds = (tldExpanded ? COMMON_TLDS : COMMON_TLDS.slice(0, 18))
+  const visibleTlds = (tldExpanded ? tldList : tldList.slice(0, 18))
     .filter(t => !tldQuery || t.includes(tldQuery.toLowerCase()));
-  const selectedExtra = (filters.tlds ?? []).filter(t => !COMMON_TLDS.includes(t));
+  const selectedExtra = (filters.tlds ?? []).filter(t => !tldList.includes(t));
 
   const addCustom = () => {
     const parts = customTld.split(/[\s,，\n]+/).map(s => s.trim().replace(/^\./, "")).filter(Boolean);
@@ -148,7 +150,7 @@ export function FilterPanel({
       <Section title={`后缀${filters.tlds?.length ? ` · 已选 ${filters.tlds.length}` : ""}`}>
         {/* 批量快捷操作 */}
         <div className="mb-2 flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), ...COMMON_TLDS])}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), ...tldList])}
             className="rounded-md border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/10">全选</button>
           <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "com","net","org","io","ai","co","app","dev","xyz"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 热门 gTLD</button>
@@ -184,10 +186,10 @@ export function FilterPanel({
               className="rounded-md border border-primary bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">.{t} ×</button>
           ))}
         </div>
-        {COMMON_TLDS.length > 18 && !tldQuery && (
+        {tldList.length > 18 && !tldQuery && (
           <button type="button" onClick={() => setTldExpanded(v => !v)}
             className="mt-2 text-xs text-primary hover:underline">
-            {tldExpanded ? "收起" : `展开全部 ${COMMON_TLDS.length} 个后缀 →`}
+            {tldExpanded ? "收起" : `展开全部 ${tldList.length} 个后缀 →`}
           </button>
         )}
         <div className="mt-2 space-y-1.5">
