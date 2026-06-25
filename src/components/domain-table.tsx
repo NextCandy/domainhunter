@@ -63,15 +63,18 @@ const RISKS = [
 ];
 
 export function FilterPanel({
-  filters, onChange, onSearch,
+  filters, onChange, onSearch, onBatchScan, batchScanning,
 }: {
   filters: DiscoverFilters;
   onChange: (next: DiscoverFilters) => void;
   onSearch?: () => void;
+  onBatchScan?: () => void;
+  batchScanning?: boolean;
 }) {
   const [tldExpanded, setTldExpanded] = useState(false);
   const [tldQuery, setTldQuery] = useState("");
   const [customTld, setCustomTld] = useState("");
+
 
   const toggle = <K extends keyof DiscoverFilters>(key: K, value: string) => {
     const current = (filters[key] as string[] | undefined) ?? [];
@@ -116,11 +119,19 @@ export function FilterPanel({
       import("sonner").then(({ toast }) => toast.error("请先选择至少 1 个后缀"));
       return;
     }
-    const ok = typeof window === "undefined"
-      ? true
-      : window.confirm(`将按 ${n} 个 TLD 进行批量查询。\n预计返回最多 ${filters.pageSize ?? 50} 条/页（数据库现有匹配记录）。\n确定开始？`);
+    // 优先：如果父组件提供了实时 RDAP 扫描入口，且填了关键词，则触发真实查询
+    const seed = (filters.q || filters.contains || filters.startsWith || filters.endsWith || "").trim();
+    if (onBatchScan && seed) {
+      const ok = typeof window === "undefined" ? true :
+        window.confirm(`将对「${seed}」× ${n} 个 TLD 发起实时 RDAP 查询（共 ${Math.min(n, 200)} 个域名）。\n确定开始？`);
+      if (ok) onBatchScan();
+      return;
+    }
+    const ok = typeof window === "undefined" ? true :
+      window.confirm(`将按 ${n} 个 TLD 过滤数据库已有记录${seed ? "" : "\n（提示：填写关键词可触发实时 RDAP 查询）"}。\n确定开始？`);
     if (ok && onSearch) onSearch();
   };
+
 
   return (
     <div className="space-y-5 text-sm">
@@ -193,13 +204,14 @@ export function FilterPanel({
           </div>
           <div className="text-[11px] text-muted-foreground">支持逗号/空格/换行分隔的批量后缀，已自动去重</div>
         </div>
-        {onSearch && (
-          <button type="button" onClick={runBatchSearch}
+        {(onSearch || onBatchScan) && (
+          <button type="button" onClick={runBatchSearch} disabled={batchScanning}
             className="btn-base btn-primary mt-3 w-full">
-            批量查询{filters.tlds?.length ? `（${filters.tlds.length} 个 TLD）` : ""}
+            {batchScanning ? "实时查询中…" : `批量查询${filters.tlds?.length ? `（${filters.tlds.length} 个 TLD）` : ""}`}
           </button>
         )}
       </Section>
+
 
       <Section title="状态">
         <div className="flex flex-wrap gap-1.5">

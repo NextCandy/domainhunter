@@ -5,7 +5,7 @@ import { Filter, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
-import { discoverFn, toggleWatchFn, refreshDomainFn, type DiscoverFilters } from "@/lib/discover.functions";
+import { discoverFn, toggleWatchFn, refreshDomainFn, liveScanFn, type DiscoverFilters } from "@/lib/discover.functions";
 import { createEnrichJobFn } from "@/lib/enrich-jobs.functions";
 import { toast } from "sonner";
 
@@ -86,6 +86,24 @@ export function DiscoverView({
     onError: (e: any) => toast.error(e?.message ?? "创建丰富任务失败"),
   });
 
+  const liveScan = useMutation({
+    mutationFn: () => liveScanFn({
+      data: {
+        tlds: filters.tlds ?? [],
+        q: filters.q,
+        startsWith: filters.startsWith,
+        endsWith: filters.endsWith,
+        contains: filters.contains,
+        limit: 200,
+      },
+    }),
+    onSuccess: (r) => {
+      toast.success(`实时查询完成：扫描 ${r.scanned} 个 · 可注册 ${r.available} · 已注册 ${r.registered} · 错误 ${r.errors}`);
+      refetch();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "实时查询失败"),
+  });
+
   return (
     <AppShell>
       <PageHeader
@@ -131,7 +149,9 @@ export function DiscoverView({
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="card-elev hidden h-fit p-4 lg:block">
-          <FilterPanel filters={filters} onChange={setFilters} onSearch={() => refetch()} />
+          <FilterPanel filters={filters} onChange={setFilters} onSearch={() => refetch()}
+            onBatchScan={() => liveScan.mutate()} batchScanning={liveScan.isPending} />
+
         </aside>
 
         <div className="min-w-0">
