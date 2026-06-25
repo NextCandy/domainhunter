@@ -196,7 +196,7 @@ async function refreshOneInternal(domain: string) {
       checked_at: new Date().toISOString(),
     });
   }
-  return { domain: parsed.domain, status, score: sc.total };
+  return { domain: parsed.domain, status, score: sc.total, domainId: domRow?.id ?? null };
 }
 
 async function refreshDomainsBulk(domains: string[]) {
