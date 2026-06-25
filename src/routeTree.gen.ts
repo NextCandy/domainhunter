@@ -9,12 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ToolsBatchRdapRoute = ToolsBatchRdapRouteImport.update({
+  id: '/tools/batch-rdap',
+  path: '/tools/batch-rdap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicJobsJobIdDownloadRoute =
@@ -25,38 +25,38 @@ const ApiPublicJobsJobIdDownloadRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/public/jobs/$jobId/download'
+  fullPaths: '/tools/batch-rdap' | '/api/public/jobs/$jobId/download'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/public/jobs/$jobId/download'
-  id: '__root__' | '/' | '/api/public/jobs/$jobId/download'
+  to: '/tools/batch-rdap' | '/api/public/jobs/$jobId/download'
+  id: '__root__' | '/tools/batch-rdap' | '/api/public/jobs/$jobId/download'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
   ApiPublicJobsJobIdDownloadRoute: typeof ApiPublicJobsJobIdDownloadRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/tools/batch-rdap': {
+      id: '/tools/batch-rdap'
+      path: '/tools/batch-rdap'
+      fullPath: '/tools/batch-rdap'
+      preLoaderRoute: typeof ToolsBatchRdapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/jobs/$jobId/download': {
@@ -70,7 +70,7 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  ToolsBatchRdapRoute: ToolsBatchRdapRoute,
   ApiPublicJobsJobIdDownloadRoute: ApiPublicJobsJobIdDownloadRoute,
 }
 export const routeTree = rootRouteImport

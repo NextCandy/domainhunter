@@ -33,7 +33,7 @@ import {
   type FormatPreset,
 } from "@/lib/domain-formats";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/tools/batch-rdap")({
   head: () => ({
     meta: [
       { title: "域名查询 — 批量 RDAP/WHOIS 查询工具" },
