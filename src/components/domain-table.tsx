@@ -215,8 +215,14 @@ export function FilterPanel({
         </div>
       </Section>
 
-      <button type="button" onClick={() => onChange({ page: 1, pageSize: filters.pageSize, sortBy: "score", sortDir: "desc" })}
-        className="btn-base btn-ghost w-full">清空筛选</button>
+      <div className="flex gap-2">
+        {onSearch && (
+          <button type="button" onClick={onSearch}
+            className="btn-base btn-primary flex-1">查询</button>
+        )}
+        <button type="button" onClick={() => onChange({ page: 1, pageSize: filters.pageSize, sortBy: "score", sortDir: "desc" })}
+          className="btn-base btn-ghost flex-1">清空</button>
+      </div>
     </div>
   );
 }
