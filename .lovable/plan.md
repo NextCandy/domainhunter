@@ -1,54 +1,78 @@
-# 实施计划
+# Domain Hunter 功能融合升级计划
 
-## 1. 用户系统（仅管理员）
-- 启用 Email/Password + Google OAuth 登录
-- 新增 `user_roles` 表 + `app_role` enum（仅 `admin`）+ `has_role()` security definer 函数
-- 新建 `/auth` 公开登录页（邮箱/密码 + Google）
-- 将所有现有管理/操作页面（`/`, `/discover`, `/admin.*`, `/domains/*`, `/watchlist` 等）迁移到 `_authenticated/` 子树
-- `_authenticated/route.tsx` 内增加 admin 角色校验：非 admin 用户登出并提示"仅管理员可访问"
-- 首位注册用户自动授予 admin 角色（trigger on auth.users insert）；后续注册需现有 admin 在 `/admin.users` 页授权
-- 现有数据表 RLS 策略收紧：从 anon 改为 `has_role(auth.uid(), 'admin')`
+将 mcpmarket domain-hunter 的产品逻辑融入现有项目，**不推倒重写**，在现有 `domains / jobs / enrich_jobs / watchlist / my_domains / registrars` 等表与页面基础上渐进扩展。
 
-## 2. Enrich 任务系统（DNS / Archive / SEO）
-新增表：
-- `enrich_jobs` — id, source_job_id (关联 jobs), kinds (text[]: dns/archive/seo), status, total, done, failed, cached_hits, started_at, finished_at, error
-- `enrich_items` — id, enrich_job_id, domain, kind, status (pending/running/done/error/cached), result jsonb, error, attempted_at
-- `enrich_cache` — domain + kind 复合主键, payload jsonb, fetched_at, ttl_seconds（DNS=6h, Archive=7d, SEO=1d）
+## 现状评估（基于当前代码）
+- 已有：RDAP 批量发现、Enrich（DNS/Archive/SEO）、watchlist、my_domains、registrars、admin（设置/历史/TLD/用户）、auth。
+- 缺失：域名灵感生成、注册商价格对比页、优惠码管理、购买建议、注册商 API 密钥加密管理、Spaceship Provider。
 
-流程：
-1. 批量 `jobs` 完成后（status='done'），如开关启用，自动 INSERT enrich_job 入队对应"未注册=可注册"或"已注册"域名（用户在创建任务时选择目标范围）
-2. 后台 server fn `runEnrichBatchFn` 按 concurrency 处理 N 项；每项先查 `enrich_cache`（未过期则命中并标记 cached），未命中调用 `fetchDns`/`fetchArchive`/`fetchSeo` 后回写 cache 与 `domain_metrics`/`domain_dns`
-3. 断点续查：进程中断后下次启动时 `enrich_items.status='pending'/'running'` 的继续；进度 = done+failed+cached / total
+## 分阶段交付（每阶段独立可运行）
 
-UI：
-- `/enrich` 路由：列出所有 enrich_jobs，进度条（done/cached/failed/total）、速率、ETA
-- 详情页 `/enrich/$id`：实时进度 + 最近完成 + 错误列表
-- 在批量任务表单中加"完成后自动 enrich"开关 + 类型勾选（DNS / Archive / SEO）
-- "继续执行"按钮（手动触发未完成项）
+### 阶段 1 — 数据层（迁移）
+- 扩展 `registrars`：新增 `slug, website, api_enabled, api_base_url, api_key_encrypted, api_secret_encrypted, status, notes`（兼容旧字段）。
+- 新增 `registrar_prices`：tld、首年/续费/转入、币种、隐私免费、API 支持、更新时间。
+- 新增 `coupons`：注册商、码、标题、TLD 范围、折扣类型、有效期、来源、verified、status。
+- 新增 `domain_ideas`：用户生成的灵感记录（关键词、参数、结果 JSON）。
+- 复用现有 `domains` 表作为 `domain_checks` 视角，状态字段扩展枚举：`available/taken/premium/reserved/invalid/unknown`。
+- 所有新表加 GRANT + RLS（admin 写、authenticated 读）。
 
-## 3. SEO 数据源
-- 新增 `fetchSeo`：优先使用 Semrush 连接器（如已连接）取 domain_analysis 关键指标；否则置空并标记 skipped
-- 写入 `domain_metrics`（da/pa/backlinks/traffic 等列已存在）
+### 阶段 2 — 服务层抽象（不改 UI）
+在 `src/lib/services/` 下建立可替换服务接口：
+- `domain-generator.service.ts`（基于规则 + 可选 Lovable AI）
+- `domain-availability.service.ts`（封装现有 RDAP，统一返回结构）
+- `registrar-price.service.ts`
+- `coupon.service.ts`
+- `registrar-provider.service.ts`（Provider 接口 + Spaceship 实现 + Mock 默认）
+- 统一 `DomainCheckResult` 类型。
+- 密钥使用 `SECRET_ENCRYPTION_KEY`（generate_secret）+ AES-GCM 加密；前端只回显 `sk_****abcd`。
 
-## 4. Enriched 结果批量导出
-- 公开下载接口 `/api/public/enrich/$id/download?kind=enriched_csv|enriched_json|available_enriched_csv`
-- 字段：domain, registered, registrar, expiry, dns_a, dns_ns, archive_first_year, archive_snapshots, seo_da, seo_backlinks, seo_traffic, score
-- 通过短期签名 token（query param）+ 服务端校验 `enrich_jobs` 存在；非 PII，公共可访问以便 cron/外部下载
+### 阶段 3 — 域名灵感页 `/ideas`
+- 表单：关键词、行业、用途、语言、长度、后缀偏好。
+- 调用 Lovable AI（gemini-3-flash）+ 规则混合生成 5–30 个候选。
+- 卡片展示：理由 / 用途 / 记忆度 / 品牌感 / 长度 / 后缀 / 是否建议购买。
+- 操作：复制、加入检测队列（跳 /discover 预填）、加入 watchlist。
 
-## 5. 边界与提示
-- enrich concurrency 1-20，QPS 1-50，cache TTL 1h-30d 表单校验
-- toast 错误提示（外部 API 失败、签名失效等）
+### 阶段 4 — 检测流增强
+- `/check` 新增轻量批量检测页（文本框 + 多后缀 fan-out + 进度 + 导出），复用现有 RDAP/jobs。
+- 状态枚举对齐 available/taken/premium/reserved/invalid/unknown。
+- 单域名检测后弹出"购买建议"组件：推荐注册商、价格、优惠码、风险提示、跳转购买链接（不自动购买）。
 
-## 技术细节
-- 全部 server fn 加 `requireSupabaseAuth` + admin 角色校验
-- 批量任务完成回调：在现有 `runJobBatchFn` 末尾检测 job 完成且 `params.auto_enrich=true` → 创建 enrich_job
-- 客户端用 `useQuery` 轮询 enrich 进度（2s 间隔），完成后停止
-- 表 GRANT：authenticated 完整 CRUD，无 anon
+### 阶段 5 — 价格对比 `/prices`
+- 表格 + 卡片，支持按 TLD 筛选与多维排序。
+- 显示价格更新时间，明确标"非实时"。
+- 后台 `/admin/prices` 增删改 `registrar_prices`。
 
-## 文件改动概要
-- supabase migration：user_roles + enrich_jobs/items/cache + RLS 重写
-- 新 `src/lib/enrich-jobs.functions.ts`、`src/lib/seo.server.ts`
-- 改 `src/lib/rdap.functions.ts`（完成钩子）
-- 新 `src/routes/auth.tsx`、`src/routes/_authenticated/enrich.tsx`、`enrich.$id.tsx`、`admin.users.tsx`
-- 迁移所有现有受保护页面到 `_authenticated/`
-- 新 `src/routes/api/public/enrich.$id.download.ts`
+### 阶段 6 — 优惠码 `/coupons` + `/admin/coupons`
+- 前台：按注册商/TLD 筛选有效优惠码；过期自动灰显。
+- 后台：CRUD + verified 标记。
+
+### 阶段 7 — 注册商 API 管理 `/admin/registrars`
+- 扩展现有 admin 页：API Key/Secret 加密保存、脱敏显示、测试连接按钮、启用/禁用。
+- Spaceship Provider：availability / list / DNS / nameserver / autorenew（注册与修改 DNS 预留 + 二次确认）。
+- 其他注册商（Namecheap/Porkbun/Dynadot/Cloudflare/NameSilo/GoDaddy）通过同一 Provider 接口扩展，初期为 stub。
+
+### 阶段 8 — Dashboard 升级
+- 在现有首页加：我的域名数、关注数、即将到期、最近检测、推荐关注、API 状态、今日检测次数 8 个卡片。
+
+### 阶段 9 — 验证
+- typecheck / build / 关键路由 smoke（/, /ideas, /check, /prices, /coupons, /watchlist, /my-domains, /admin/*）。
+- 移动端断点 review。
+
+## 安全
+- 密钥 AES-GCM 加密入库；前端永不回显完整密钥。
+- 所有写操作走 `requireSupabaseAuth` + `has_role('admin')`。
+- 危险操作（注册/改 DNS/删配置）二次确认弹窗。
+- 不实现自动购买；购买按钮仅 deep-link 到注册商。
+
+## 兼容性承诺
+- 不删除现有路由 / 表 / 列；只做加列与新表。
+- 不修改 auto-gen 文件。
+- 现有 RDAP/Enrich/Watchlist/Admin 流程保持可用。
+
+## 交付节奏建议
+单回合做不完全部 9 个阶段。建议本回合先完成 **阶段 1–3（数据层 + 服务抽象 + 域名灵感页）**，作为最小可见增量，下一回合继续阶段 4 起。
+
+请确认：
+1. 是否同意按此阶段顺序推进、本回合先做阶段 1–3？
+2. 域名灵感生成是否同意默认使用 Lovable AI（gemini-3-flash，已有 LOVABLE_API_KEY）？
+3. 优惠码后台 CRUD 是否只限管理员？（默认是）
