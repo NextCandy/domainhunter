@@ -213,3 +213,115 @@ export const deleteCouponFn = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+// ───────── Registrar price sync (real-time API) ─────────
+// Reads registrars where api_enabled=true and config_json.prices_url is set,
+// fetches a JSON array `[{tld, register, renew?, transfer?, currency?}]`
+// and upserts into registrar_prices.
+type SyncResult = { registrar_id: number; registrar: string; ok: boolean; inserted: number; updated: number; error?: string };
+
+async function syncOne(registrar: any): Promise<SyncResult> {
+  const cfg = (registrar.config_json ?? {}) as Record<string, any>;
+  const url: string | undefined = cfg.prices_url;
+  const out: SyncResult = { registrar_id: registrar.id, registrar: registrar.name, ok: false, inserted: 0, updated: 0 };
+  if (!url) { out.error = "缺少 config_json.prices_url"; return out; }
+  try {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (cfg.auth_header && cfg.auth_value) headers[cfg.auth_header] = cfg.auth_value;
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const raw = await res.json();
+    const items: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : Array.isArray(raw?.prices) ? raw.prices : [];
+    const s = sb();
+    for (const it of items) {
+      const tld = normTld(String(it.tld ?? it.extension ?? ""));
+      if (!tld) continue;
+      const payload = {
+        registrar_id: registrar.id,
+        tld,
+        register_price: it.register != null ? Number(it.register) : it.register_price != null ? Number(it.register_price) : null,
+        renew_price: it.renew != null ? Number(it.renew) : it.renew_price != null ? Number(it.renew_price) : null,
+        transfer_price: it.transfer != null ? Number(it.transfer) : null,
+        currency: it.currency ?? "USD",
+      };
+      const existing = await s.from("registrar_prices").select("id").eq("registrar_id", registrar.id).eq("tld", tld).maybeSingle();
+      if (existing.data?.id) {
+        await s.from("registrar_prices").update(payload).eq("id", existing.data.id);
+        out.updated++;
+      } else {
+        await s.from("registrar_prices").insert(payload);
+        out.inserted++;
+      }
+    }
+    out.ok = true;
+    return out;
+  } catch (e: any) {
+    out.error = e?.message ?? String(e);
+    return out;
+  }
+}
+
+export const syncRegistrarPricesFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { registrarId?: number } = {}) => z.object({ registrarId: z.number().optional() }).parse(d))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context.supabase, context.userId);
+    const s = sb();
+    let q = s.from("registrars").select("id,name,enabled,config_json,api_enabled").eq("enabled", true);
+    if (data.registrarId) q = q.eq("id", data.registrarId);
+    const { data: regs, error } = await q;
+    if (error) throw error;
+    const results: SyncResult[] = [];
+    for (const r of regs ?? []) results.push(await syncOne(r));
+    return { results, totalInserted: results.reduce((a, b) => a + b.inserted, 0), totalUpdated: results.reduce((a, b) => a + b.updated, 0) };
+  });
+
+// Internal helper used by the cron hook (no middleware).
+export async function syncAllRegistrarPricesInternal() {
+  const s = sb();
+  const { data: regs } = await s.from("registrars").select("id,name,enabled,config_json,api_enabled").eq("enabled", true);
+  const results: SyncResult[] = [];
+  for (const r of regs ?? []) results.push(await syncOne(r));
+  return results;
+}
+
+// ───────── Purchase writeback → my_domains ─────────
+export const recordPurchaseFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: any) => z.object({
+    domain: z.string().min(3).max(253),
+    registrar: z.string().max(80).optional(),
+    note: z.string().max(500).optional(),
+    expiry_date: z.string().optional().nullable(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const s = sb();
+    const domain = data.domain.trim().toLowerCase();
+    const existing = await s.from("my_domains").select("id").eq("domain", domain).maybeSingle();
+    if (existing.data?.id) {
+      await s.from("my_domains").update({
+        registrar: data.registrar ?? null,
+        note: data.note ?? null,
+        expiry_date: data.expiry_date ?? null,
+      }).eq("id", existing.data.id);
+    } else {
+      await s.from("my_domains").insert({
+        domain,
+        registrar: data.registrar ?? null,
+        note: data.note ?? "通过价格对比页购买",
+        expiry_date: data.expiry_date ?? null,
+        tags: ["purchased"],
+        renew_reminder: true,
+      });
+    }
+    // Trigger enrichment job (DNS + Archive + SEO) so the new domain shows up enriched.
+    try {
+      await s.from("enrich_jobs").insert({
+        status: "queued",
+        scope: "manual",
+        targets: [domain],
+        total: 1,
+      } as any);
+    } catch { /* table may have differing columns; non-fatal */ }
+    return { ok: true, domain };
+  });
