@@ -20,7 +20,7 @@ function sbAdmin() {
 
 const TLD_SAFE = /^[a-z0-9-]+$/i;
 
-function parseDomain(input: string): { domain: string; name: string; tld: string } | null {
+export function parseDomain(input: string): { domain: string; name: string; tld: string } | null {
   const d = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   if (!d || d.length > 253) return null;
   const idx = d.indexOf(".");
