@@ -1,11 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Search, ExternalLink, Tag, Sparkles, ShieldCheck, Zap } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { z } from "zod";
+import { Search, ExternalLink, Tag, Sparkles, ShieldCheck, Zap, ShoppingCart } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell, PageHeader, EmptyState } from "@/components/app-shell";
-import { compareTldFn } from "@/lib/pricing.functions";
+import { compareTldFn, recordPurchaseFn } from "@/lib/pricing.functions";
+
+const searchSchema = z.object({
+  tld: z.string().optional(),
+  domain: z.string().optional(),
+});
 
 export const Route = createFileRoute("/pricing")({
+  validateSearch: (s) => searchSchema.parse(s),
   component: () => <AppShell><PricingPage /></AppShell>,
 });
 
@@ -17,13 +25,29 @@ function fmtPrice(p: number | null | undefined, ccy: string | null | undefined) 
 }
 
 function PricingPage() {
-  const [tld, setTld] = useState("com");
-  const [domain, setDomain] = useState("");
-  const [submitted, setSubmitted] = useState<{ tld: string; domain?: string }>({ tld: "com" });
+  const search = Route.useSearch();
+  const initTld = (search.tld ?? "com").replace(/^\./, "");
+  const initDomain = search.domain ?? "";
+  const [tld, setTld] = useState(initTld);
+  const [domain, setDomain] = useState(initDomain);
+  const [submitted, setSubmitted] = useState<{ tld: string; domain?: string }>({ tld: initTld, domain: initDomain || undefined });
+
+  // Re-sync when query string changes (e.g. from /ideas)
+  useEffect(() => {
+    const t = (search.tld ?? "com").replace(/^\./, "");
+    const d = search.domain ?? "";
+    setTld(t); setDomain(d); setSubmitted({ tld: t, domain: d || undefined });
+  }, [search.tld, search.domain]);
 
   const q = useQuery({
     queryKey: ["compare", submitted.tld, submitted.domain],
     queryFn: () => compareTldFn({ data: submitted }),
+  });
+
+  const buyMut = useMutation({
+    mutationFn: (v: { domain: string; registrar: string }) => recordPurchaseFn({ data: v }),
+    onSuccess: (r) => toast.success(`已记录购买：${r.domain}（已加入"我的域名"并触发丰富抓取）`),
+    onError: (e: any) => toast.error(e?.message ?? "记录失败"),
   });
 
   const rows = q.data?.rows ?? [];
@@ -91,11 +115,23 @@ function PricingPage() {
                 {best.api_supported && <span className="ml-2 inline-flex items-center gap-1 text-primary"><Zap className="h-3 w-3" />API 可用</span>}
               </div>
             </div>
-            {best.buy_url_template && (
-              <a href={best.buy_url_template} target="_blank" rel="noreferrer" className="btn-base btn-primary">
-                前往购买<ExternalLink className="h-4 w-4" />
-              </a>
-            )}
+            <div className="flex gap-2">
+              {best.buy_url_template && (
+                <a href={best.buy_url_template} target="_blank" rel="noreferrer" className="btn-base btn-primary">
+                  前往购买<ExternalLink className="h-4 w-4" />
+                </a>
+              )}
+              {submitted.domain && (
+                <button
+                  onClick={() => buyMut.mutate({ domain: submitted.domain!, registrar: best.registrar_name })}
+                  disabled={buyMut.isPending}
+                  className="btn-base"
+                  title="标记已购买 → 加入我的域名"
+                >
+                  <ShoppingCart className="h-4 w-4" />标记已购
+                </button>
+              )}
+            </div>
           </div>
         </section>
       )}
@@ -153,11 +189,23 @@ function PricingPage() {
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums font-semibold">{r.recommend_score}</td>
                     <td className="px-4 py-2 text-right">
-                      {r.buy_url_template && (
-                        <a href={r.buy_url_template} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                          购买<ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        {r.buy_url_template && (
+                          <a href={r.buy_url_template} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                            购买<ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                        {submitted.domain && (
+                          <button
+                            onClick={() => buyMut.mutate({ domain: submitted.domain!, registrar: r.registrar_name })}
+                            disabled={buyMut.isPending}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground ring-1 ring-inset ring-border hover:text-foreground"
+                            title="记录购买并加入我的域名"
+                          >
+                            <ShoppingCart className="h-3 w-3" />标记已购
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
