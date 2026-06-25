@@ -470,3 +470,20 @@ function Stat({ label, value, accent }: { label: string; value: number | string;
     </div>
   );
 }
+
+function StratNum({ label, value, onChange, min, max, step = 1 }: {
+  label: string; value: number; onChange: (v: number) => void; min: number; max: number; step?: number;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <input type="number" min={min} max={max} step={step} value={value}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (!Number.isFinite(n)) return;
+          onChange(Math.max(min, Math.min(max, n)));
+        }}
+        className="field w-full" />
+    </label>
+  );
+}
