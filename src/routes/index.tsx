@@ -250,13 +250,13 @@ function NewTask() {
   const [listInput, setListInput] = useState("");
 
   const [taskName, setTaskName] = useState(() => defaultTaskName());
-  const [qps, setQps] = useState(5);
-  const [concurrency, setConcurrency] = useState(20);
-  const [perHostQps, setPerHostQps] = useState(10);
-  const [limit, setLimit] = useState(0);
-  const [maxTotal, setMaxTotal] = useState(1_000_000);
-  const [timeout, setTimeout] = useState(30);
-  const [retries, setRetries] = useState(2);
+  const [qps, setQps] = useState(LIMITS.qps.default);
+  const [concurrency, setConcurrency] = useState(LIMITS.concurrency.default);
+  const [perHostQps, setPerHostQps] = useState(LIMITS.perHostQps.default);
+  const [limit, setLimit] = useState(LIMITS.limit.default);
+  const [maxTotal, setMaxTotal] = useState(LIMITS.maxTotal.default);
+  const [timeout, setTimeout] = useState(LIMITS.timeoutSec.default);
+  const [retries, setRetries] = useState(LIMITS.retries.default);
 
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
