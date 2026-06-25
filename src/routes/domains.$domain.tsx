@@ -73,8 +73,9 @@ function DomainDetailPage() {
               <span className="text-muted-foreground">{d.length} 字符 · {d.type}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => refreshMut.mutate()} disabled={refreshMut.isPending} className="btn-base btn-ghost"><RefreshCw className={`h-4 w-4 ${refreshMut.isPending ? "animate-spin" : ""}`} />刷新</button>
+            <button onClick={() => enrichMut.mutate()} disabled={enrichMut.isPending} className="btn-base btn-ghost"><Sparkles className={`h-4 w-4 ${enrichMut.isPending ? "animate-pulse" : ""}`} />{enrichMut.isPending ? "抓取中…" : "丰富 DNS/Archive"}</button>
             <button onClick={() => watchMut.mutate()} className={`btn-base ${watching ? "btn-ghost" : "btn-primary"}`}><Eye className="h-4 w-4" />{watching ? "已观察" : "加入观察"}</button>
             <a href={`https://www.namecheap.com/domains/registration/results/?domain=${d.domain}`} target="_blank" rel="noreferrer" className="btn-base btn-primary"><ExternalLink className="h-4 w-4" />注册</a>
           </div>
