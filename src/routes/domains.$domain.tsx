@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Eye, ExternalLink, ArrowLeft } from "lucide-react";
+import { RefreshCw, Eye, ExternalLink, ArrowLeft, Sparkles } from "lucide-react";
 import { AppShell, ScoreBadge, StatusBadge, RiskBadge, EmptyState } from "@/components/app-shell";
-import { domainDetailFn, refreshDomainFn, toggleWatchFn, checkRelatedTldsFn } from "@/lib/discover.functions";
+import { domainDetailFn, refreshDomainFn, toggleWatchFn, checkRelatedTldsFn, enrichDomainFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/domains/$domain")({
