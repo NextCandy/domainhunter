@@ -42,6 +42,11 @@ export function DiscoverView({
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const pausedRef = useRef(false);
 
+  // ── 可配置扫描策略（实时生效） ──
+  const [strategy, setStrategy] = useState({ batchSize: 10, pauseMs: 600, maxRetries: 2, timeoutMs: 30000 });
+  const strategyRef = useRef(strategy);
+  useEffect(() => { strategyRef.current = strategy; }, [strategy]);
+
   // ── Single-domain quick lookup ──
   const [quickDomain, setQuickDomain] = useState("");
   const [quickResult, setQuickResult] = useState<any | null>(null);
@@ -55,6 +60,38 @@ export function DiscoverView({
       toast.success(`${(r as any).domain} · ${tag}`);
     },
     onError: (e: any) => { setQuickResult({ status: "error", error: e?.message }); toast.error(e?.message ?? "查询失败"); },
+  });
+
+  // ── RDAP 连通性 / 限流测试 ──
+  const [pingDomain, setPingDomain] = useState("example.com");
+  const [pingResult, setPingResult] = useState<{
+    ok: boolean; status: string; latencyMs: number; rateLimited: boolean; source?: string; error?: string;
+  } | null>(null);
+  const pingTest = useMutation({
+    mutationFn: async (d: string) => {
+      const t0 = performance.now();
+      try {
+        const r: any = await lookupDomainFn({ data: { domain: d } });
+        const latencyMs = Math.round(performance.now() - t0);
+        const err = (r.error ?? "").toString().toLowerCase();
+        const rateLimited = /429|rate.?limit|too many/.test(err);
+        return {
+          ok: r.status !== "error",
+          status: r.status, latencyMs, rateLimited,
+          source: r.source, error: r.error,
+        };
+      } catch (e: any) {
+        const latencyMs = Math.round(performance.now() - t0);
+        const msg = e?.message ?? "网络错误";
+        return { ok: false, status: "error", latencyMs, rateLimited: /429|rate.?limit/i.test(msg), error: msg };
+      }
+    },
+    onSuccess: (r) => {
+      setPingResult(r);
+      if (r.rateLimited) toast.error(`已被限流（${r.latencyMs}ms），建议调高批间隔`);
+      else if (r.ok) toast.success(`RDAP 正常 · ${r.latencyMs}ms · ${r.source ?? ""}`);
+      else toast.error(`RDAP 异常：${r.error ?? r.status}`);
+    },
   });
 
   const { data, isFetching, refetch } = useQuery({
