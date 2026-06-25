@@ -30,6 +30,16 @@ function AdminSettings() {
     onSuccess: () => { toast.success("已保存"); qc.invalidateQueries({ queryKey: ["app-settings"] }); },
     onError: (e: any) => toast.error(e?.message ?? "保存失败"),
   });
+  const testNotify = useMutation({
+    mutationFn: () => sendTestNotificationFn({ data: { bark: form.notify_bark ?? "", webhook: form.notify_webhook ?? "" } }),
+    onSuccess: r => {
+      const okN = r.results.filter(x => x.ok).length;
+      const failN = r.results.length - okN;
+      if (failN === 0) toast.success(`已发送 ${okN} 条测试通知`);
+      else toast.warning(`成功 ${okN} · 失败 ${failN}：${r.results.filter(x => !x.ok).map(x => `${x.channel}(${x.status ?? x.error})`).join(", ")}`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "发送失败"),
+  });
 
   const F = (k: keyof SettingsShape, label: string, placeholder?: string) => (
     <div>
