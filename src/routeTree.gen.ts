@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WatchlistRouteImport } from './routes/watchlist'
 import { Route as PendingRouteImport } from './routes/pending'
 import { Route as MyDomainsRouteImport } from './routes/my-domains'
+import { Route as IdeasRouteImport } from './routes/ideas'
 import { Route as EnrichRouteImport } from './routes/enrich'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DeletedRouteImport } from './routes/deleted'
@@ -47,6 +48,11 @@ const PendingRoute = PendingRouteImport.update({
 const MyDomainsRoute = MyDomainsRouteImport.update({
   id: '/my-domains',
   path: '/my-domains',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IdeasRoute = IdeasRouteImport.update({
+  id: '/ideas',
+  path: '/ideas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EnrichRoute = EnrichRouteImport.update({
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/enrich': typeof EnrichRouteWithChildren
+  '/ideas': typeof IdeasRoute
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/enrich': typeof EnrichRouteWithChildren
+  '/ideas': typeof IdeasRoute
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
@@ -217,6 +225,7 @@ export interface FileRoutesById {
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/enrich': typeof EnrichRouteWithChildren
+  '/ideas': typeof IdeasRoute
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/deleted'
     | '/discover'
     | '/enrich'
+    | '/ideas'
     | '/my-domains'
     | '/pending'
     | '/watchlist'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/deleted'
     | '/discover'
     | '/enrich'
+    | '/ideas'
     | '/my-domains'
     | '/pending'
     | '/watchlist'
@@ -296,6 +307,7 @@ export interface FileRouteTypes {
     | '/deleted'
     | '/discover'
     | '/enrich'
+    | '/ideas'
     | '/my-domains'
     | '/pending'
     | '/watchlist'
@@ -323,6 +335,7 @@ export interface RootRouteChildren {
   DeletedRoute: typeof DeletedRoute
   DiscoverRoute: typeof DiscoverRoute
   EnrichRoute: typeof EnrichRouteWithChildren
+  IdeasRoute: typeof IdeasRoute
   MyDomainsRoute: typeof MyDomainsRoute
   PendingRoute: typeof PendingRoute
   WatchlistRoute: typeof WatchlistRoute
@@ -353,6 +366,13 @@ declare module '@tanstack/react-router' {
       path: '/my-domains'
       fullPath: '/my-domains'
       preLoaderRoute: typeof MyDomainsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ideas': {
+      id: '/ideas'
+      path: '/ideas'
+      fullPath: '/ideas'
+      preLoaderRoute: typeof IdeasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/enrich': {
@@ -550,6 +570,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeletedRoute: DeletedRoute,
   DiscoverRoute: DiscoverRoute,
   EnrichRoute: EnrichRouteWithChildren,
+  IdeasRoute: IdeasRoute,
   MyDomainsRoute: MyDomainsRoute,
   PendingRoute: PendingRoute,
   WatchlistRoute: WatchlistRoute,

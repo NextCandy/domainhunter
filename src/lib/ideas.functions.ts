@@ -24,8 +24,8 @@ export const generateIdeasFn = createServerFn({ method: "POST" })
       await context.supabase.from("domain_ideas").insert({
         user_id: context.userId,
         keywords: data.keywords,
-        params: data,
-        results: ideas,
+        params: data as unknown as Record<string, unknown>,
+        results: ideas as unknown as Record<string, unknown>[],
       });
     } catch {}
     return { ideas };
