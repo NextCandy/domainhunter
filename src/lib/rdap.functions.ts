@@ -384,6 +384,29 @@ export const requeueErrorsFn = createServerFn({ method: "POST" })
     return { requeued: errCount || 0 };
   });
 
+const progressSchema = z.object({ jobId: z.string().uuid("无效的 jobId") });
+export const jobProgressFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => progressSchema.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: job } = await supabaseAdmin
+      .from("jobs")
+      .select("id,name,status,total,checked,available,registered,errors,unsupported,started_at,finished_at")
+      .eq("id", data.jobId)
+      .maybeSingle();
+    if (!job) throw new Error("任务不存在");
+    const { data: errs } = await supabaseAdmin
+      .from("job_items")
+      .select("domain,error,checked_at")
+      .eq("job_id", data.jobId)
+      .eq("status", "error")
+      .order("checked_at", { ascending: false })
+      .limit(20);
+    return { job, errors: (errs ?? []) as { domain: string; error: string; checked_at: string }[] };
+  });
+
+
+
 const recentSchema = z.object({
   jobId: z.string().uuid("无效的 jobId"),
   kind: z.enum(["available", "error"]),
