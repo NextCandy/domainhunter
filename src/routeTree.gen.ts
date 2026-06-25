@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as PendingRouteImport } from './routes/pending'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DeletedRouteImport } from './routes/deleted'
+import { Route as AuctionsRouteImport } from './routes/auctions'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
@@ -29,6 +30,11 @@ const DiscoverRoute = DiscoverRouteImport.update({
 const DeletedRoute = DeletedRouteImport.update({
   id: '/deleted',
   path: '/deleted',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuctionsRoute = AuctionsRouteImport.update({
+  id: '/auctions',
+  path: '/auctions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -50,6 +56,7 @@ const ApiPublicJobsJobIdDownloadRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/pending': typeof PendingRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/pending': typeof PendingRoute
@@ -67,6 +75,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/pending': typeof PendingRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auctions'
     | '/deleted'
     | '/discover'
     | '/pending'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auctions'
     | '/deleted'
     | '/discover'
     | '/pending'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/auctions'
     | '/deleted'
     | '/discover'
     | '/pending'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuctionsRoute: typeof AuctionsRoute
   DeletedRoute: typeof DeletedRoute
   DiscoverRoute: typeof DiscoverRoute
   PendingRoute: typeof PendingRoute
@@ -132,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeletedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auctions': {
+      id: '/auctions'
+      path: '/auctions'
+      fullPath: '/auctions'
+      preLoaderRoute: typeof AuctionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuctionsRoute: AuctionsRoute,
   DeletedRoute: DeletedRoute,
   DiscoverRoute: DiscoverRoute,
   PendingRoute: PendingRoute,
