@@ -115,11 +115,23 @@ function PricingPage() {
                 {best.api_supported && <span className="ml-2 inline-flex items-center gap-1 text-primary"><Zap className="h-3 w-3" />API 可用</span>}
               </div>
             </div>
-            {best.buy_url_template && (
-              <a href={best.buy_url_template} target="_blank" rel="noreferrer" className="btn-base btn-primary">
-                前往购买<ExternalLink className="h-4 w-4" />
-              </a>
-            )}
+            <div className="flex gap-2">
+              {best.buy_url_template && (
+                <a href={best.buy_url_template} target="_blank" rel="noreferrer" className="btn-base btn-primary">
+                  前往购买<ExternalLink className="h-4 w-4" />
+                </a>
+              )}
+              {submitted.domain && (
+                <button
+                  onClick={() => buyMut.mutate({ domain: submitted.domain!, registrar: best.registrar_name })}
+                  disabled={buyMut.isPending}
+                  className="btn-base"
+                  title="标记已购买 → 加入我的域名"
+                >
+                  <ShoppingCart className="h-4 w-4" />标记已购
+                </button>
+              )}
+            </div>
           </div>
         </section>
       )}
@@ -177,11 +189,23 @@ function PricingPage() {
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums font-semibold">{r.recommend_score}</td>
                     <td className="px-4 py-2 text-right">
-                      {r.buy_url_template && (
-                        <a href={r.buy_url_template} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                          购买<ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        {r.buy_url_template && (
+                          <a href={r.buy_url_template} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                            购买<ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                        {submitted.domain && (
+                          <button
+                            onClick={() => buyMut.mutate({ domain: submitted.domain!, registrar: r.registrar_name })}
+                            disabled={buyMut.isPending}
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground ring-1 ring-inset ring-border hover:text-foreground"
+                            title="记录购买并加入我的域名"
+                          >
+                            <ShoppingCart className="h-3 w-3" />标记已购
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
