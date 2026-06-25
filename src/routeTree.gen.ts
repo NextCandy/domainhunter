@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PendingRouteImport } from './routes/pending'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DeletedRouteImport } from './routes/deleted'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
 
+const PendingRoute = PendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DiscoverRoute = DiscoverRouteImport.update({
   id: '/discover',
   path: '/discover',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/pending': typeof PendingRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/pending': typeof PendingRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -61,6 +69,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
+  '/pending': typeof PendingRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -70,6 +79,7 @@ export interface FileRouteTypes {
     | '/'
     | '/deleted'
     | '/discover'
+    | '/pending'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
   fileRoutesByTo: FileRoutesByTo
@@ -77,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/deleted'
     | '/discover'
+    | '/pending'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
   id:
@@ -84,6 +95,7 @@ export interface FileRouteTypes {
     | '/'
     | '/deleted'
     | '/discover'
+    | '/pending'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
   fileRoutesById: FileRoutesById
@@ -92,12 +104,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DeletedRoute: typeof DeletedRoute
   DiscoverRoute: typeof DiscoverRoute
+  PendingRoute: typeof PendingRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
   ApiPublicJobsJobIdDownloadRoute: typeof ApiPublicJobsJobIdDownloadRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pending': {
+      id: '/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/discover': {
       id: '/discover'
       path: '/discover'
@@ -140,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DeletedRoute: DeletedRoute,
   DiscoverRoute: DiscoverRoute,
+  PendingRoute: PendingRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
   ApiPublicJobsJobIdDownloadRoute: ApiPublicJobsJobIdDownloadRoute,
 }
