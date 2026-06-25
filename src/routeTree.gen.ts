@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DiscoverRouteImport } from './routes/discover'
+import { Route as DeletedRouteImport } from './routes/deleted'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
@@ -17,6 +18,11 @@ import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/pub
 const DiscoverRoute = DiscoverRouteImport.update({
   id: '/discover',
   path: '/discover',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeletedRoute = DeletedRouteImport.update({
+  id: '/deleted',
+  path: '/deleted',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -38,12 +44,14 @@ const ApiPublicJobsJobIdDownloadRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
@@ -51,6 +59,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
@@ -59,18 +68,21 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/deleted'
     | '/discover'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/deleted'
     | '/discover'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
   id:
     | '__root__'
     | '/'
+    | '/deleted'
     | '/discover'
     | '/tools/batch-rdap'
     | '/api/public/jobs/$jobId/download'
@@ -78,6 +90,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DeletedRoute: typeof DeletedRoute
   DiscoverRoute: typeof DiscoverRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
   ApiPublicJobsJobIdDownloadRoute: typeof ApiPublicJobsJobIdDownloadRoute
@@ -90,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/discover'
       fullPath: '/discover'
       preLoaderRoute: typeof DiscoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deleted': {
+      id: '/deleted'
+      path: '/deleted'
+      fullPath: '/deleted'
+      preLoaderRoute: typeof DeletedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -118,6 +138,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DeletedRoute: DeletedRoute,
   DiscoverRoute: DiscoverRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
   ApiPublicJobsJobIdDownloadRoute: ApiPublicJobsJobIdDownloadRoute,
