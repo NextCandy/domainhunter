@@ -22,6 +22,7 @@ import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as DomainsDomainRouteImport } from './routes/domains.$domain'
 import { Route as AdminSourcesRouteImport } from './routes/admin.sources'
 import { Route as AdminScoringRouteImport } from './routes/admin.scoring'
+import { Route as AdminRegistrarsRouteImport } from './routes/admin.registrars'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
 
 const WatchlistRoute = WatchlistRouteImport.update({
@@ -89,6 +90,11 @@ const AdminScoringRoute = AdminScoringRouteImport.update({
   path: '/scoring',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminRegistrarsRoute = AdminRegistrarsRouteImport.update({
+  id: '/registrars',
+  path: '/registrars',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiPublicJobsJobIdDownloadRoute =
   ApiPublicJobsJobIdDownloadRouteImport.update({
     id: '/api/public/jobs/$jobId/download',
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
+  '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/sources': typeof AdminSourcesRoute
   '/domains/$domain': typeof DomainsDomainRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
+  '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/sources': typeof AdminSourcesRoute
   '/domains/$domain': typeof DomainsDomainRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
   '/watchlist': typeof WatchlistRoute
+  '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/sources': typeof AdminSourcesRoute
   '/domains/$domain': typeof DomainsDomainRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/my-domains'
     | '/pending'
     | '/watchlist'
+    | '/admin/registrars'
     | '/admin/scoring'
     | '/admin/sources'
     | '/domains/$domain'
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/my-domains'
     | '/pending'
     | '/watchlist'
+    | '/admin/registrars'
     | '/admin/scoring'
     | '/admin/sources'
     | '/domains/$domain'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/my-domains'
     | '/pending'
     | '/watchlist'
+    | '/admin/registrars'
     | '/admin/scoring'
     | '/admin/sources'
     | '/domains/$domain'
@@ -301,6 +313,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminScoringRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/registrars': {
+      id: '/admin/registrars'
+      path: '/registrars'
+      fullPath: '/admin/registrars'
+      preLoaderRoute: typeof AdminRegistrarsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/public/jobs/$jobId/download': {
       id: '/api/public/jobs/$jobId/download'
       path: '/api/public/jobs/$jobId/download'
@@ -312,12 +331,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminRegistrarsRoute: typeof AdminRegistrarsRoute
   AdminScoringRoute: typeof AdminScoringRoute
   AdminSourcesRoute: typeof AdminSourcesRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminRegistrarsRoute: AdminRegistrarsRoute,
   AdminScoringRoute: AdminScoringRoute,
   AdminSourcesRoute: AdminSourcesRoute,
   AdminIndexRoute: AdminIndexRoute,
