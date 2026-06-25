@@ -120,8 +120,33 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
             null,
             2,
           );
+        } else if (kind === "csv") {
+          contentType = "text/csv; charset=utf-8";
+          filename = "results.csv";
+          const lines = ["domain,tld,status,source,registrar,expires,error"];
+          const PAGE = 1000;
+          let from = 0;
+          while (true) {
+            const { data, error } = await supabaseAdmin
+              .from("job_items")
+              .select("domain, tld, status, info, error")
+              .eq("job_id", jobId)
+              .order("domain")
+              .range(from, from + PAGE - 1);
+            if (error || !data || data.length === 0) break;
+            for (const r of data as any[]) {
+              const info = r.info || {};
+              lines.push([
+                r.domain, r.tld || r.domain.split(".").slice(1).join("."), r.status,
+                info.source || "", info.registrar || "", info.expiresDate || "", r.error || "",
+              ].map(csvEscape).join(","));
+            }
+            if (data.length < PAGE) break;
+            from += PAGE;
+          }
+          body = lines.join("\n") + "\n";
         } else {
-          // all
+          // all (TSV)
           contentType = "text/tab-separated-values; charset=utf-8";
           filename = "all_results.tsv";
           const lines = [
@@ -159,6 +184,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
           }
           body = lines.join("\n") + "\n";
         }
+
 
         return new Response(body, {
           headers: {
