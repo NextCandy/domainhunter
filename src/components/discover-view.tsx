@@ -5,7 +5,7 @@ import { Filter, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
-import { discoverFn, toggleWatchFn, refreshDomainFn, type DiscoverFilters } from "@/lib/discover.functions";
+import { discoverFn, toggleWatchFn, refreshDomainFn, liveScanFn, type DiscoverFilters } from "@/lib/discover.functions";
 import { createEnrichJobFn } from "@/lib/enrich-jobs.functions";
 import { toast } from "sonner";
 
