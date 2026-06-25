@@ -290,6 +290,145 @@ export type Database = {
         }
         Relationships: []
       }
+      enrich_cache: {
+        Row: {
+          domain: string
+          fetched_at: string
+          kind: string
+          payload: Json
+          ttl_seconds: number
+        }
+        Insert: {
+          domain: string
+          fetched_at?: string
+          kind: string
+          payload: Json
+          ttl_seconds?: number
+        }
+        Update: {
+          domain?: string
+          fetched_at?: string
+          kind?: string
+          payload?: Json
+          ttl_seconds?: number
+        }
+        Relationships: []
+      }
+      enrich_items: {
+        Row: {
+          attempted_at: string | null
+          created_at: string
+          domain: string
+          enrich_job_id: string
+          error: string | null
+          id: number
+          kind: string
+          result: Json | null
+          status: string
+        }
+        Insert: {
+          attempted_at?: string | null
+          created_at?: string
+          domain: string
+          enrich_job_id: string
+          error?: string | null
+          id?: number
+          kind: string
+          result?: Json | null
+          status?: string
+        }
+        Update: {
+          attempted_at?: string | null
+          created_at?: string
+          domain?: string
+          enrich_job_id?: string
+          error?: string | null
+          id?: number
+          kind?: string
+          result?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrich_items_enrich_job_id_fkey"
+            columns: ["enrich_job_id"]
+            isOneToOne: false
+            referencedRelation: "enrich_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrich_jobs: {
+        Row: {
+          cache_ttl_seconds: number
+          cached_hits: number
+          concurrency: number
+          created_at: string
+          done: number
+          error: string | null
+          failed: number
+          finished_at: string | null
+          id: string
+          kinds: string[]
+          last_progress_at: string | null
+          name: string
+          qps: number
+          scope: string
+          source_job_id: string | null
+          started_at: string | null
+          status: string
+          total: number
+        }
+        Insert: {
+          cache_ttl_seconds?: number
+          cached_hits?: number
+          concurrency?: number
+          created_at?: string
+          done?: number
+          error?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          kinds?: string[]
+          last_progress_at?: string | null
+          name: string
+          qps?: number
+          scope?: string
+          source_job_id?: string | null
+          started_at?: string | null
+          status?: string
+          total?: number
+        }
+        Update: {
+          cache_ttl_seconds?: number
+          cached_hits?: number
+          concurrency?: number
+          created_at?: string
+          done?: number
+          error?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          kinds?: string[]
+          last_progress_at?: string | null
+          name?: string
+          qps?: number
+          scope?: string
+          source_job_id?: string | null
+          started_at?: string | null
+          status?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrich_jobs_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_events: {
         Row: {
           created_at: string
@@ -523,6 +662,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       watchlist: {
         Row: {
           created_at: string
@@ -575,11 +735,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -706,6 +873,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin"],
+    },
   },
 } as const

@@ -213,6 +213,12 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         .update({ status: "completed", finished_at: new Date().toISOString() })
         .eq("id", data.jobId);
       await logEvent(data.jobId, "completed", { message: "任务已完成" });
+      try {
+        const { maybeAutoEnrich } = await import("./enrich-jobs.functions");
+        await maybeAutoEnrich(data.jobId);
+      } catch (e: any) {
+        await logEvent(data.jobId, "auto_enrich_failed", { level: "warning", message: String(e?.message ?? e) });
+      }
       return { processed: 0, remaining: 0, stopped: false };
     }
 
@@ -314,6 +320,12 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         .update({ status: "completed", finished_at: new Date().toISOString() })
         .eq("id", data.jobId);
       await logEvent(data.jobId, "completed", { message: "任务已完成" });
+      try {
+        const { maybeAutoEnrich } = await import("./enrich-jobs.functions");
+        await maybeAutoEnrich(data.jobId);
+      } catch (e: any) {
+        await logEvent(data.jobId, "auto_enrich_failed", { level: "warning", message: String(e?.message ?? e) });
+      }
     }
 
     return { processed: pendingItems.length, remaining, stopped: false };

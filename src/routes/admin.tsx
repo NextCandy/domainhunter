@@ -11,6 +11,7 @@ const TABS = [
   { to: "/admin/scoring", label: "评分规则" },
   { to: "/admin/registrars", label: "注册商" },
   { to: "/admin/jobs", label: "任务队列" },
+  { to: "/admin/users", label: "用户" },
   { to: "/admin/settings", label: "系统设置" },
 ];
 
