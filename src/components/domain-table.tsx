@@ -150,7 +150,7 @@ export function FilterPanel({
       <Section title={`后缀${filters.tlds?.length ? ` · 已选 ${filters.tlds.length}` : ""}`}>
         {/* 批量快捷操作 */}
         <div className="mb-2 flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), ...COMMON_TLDS])}
+          <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), ...tldList])}
             className="rounded-md border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/10">全选</button>
           <button type="button" onClick={() => setTlds([...(filters.tlds ?? []), "com","net","org","io","ai","co","app","dev","xyz"])}
             className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 热门 gTLD</button>
