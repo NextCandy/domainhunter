@@ -85,6 +85,14 @@ export function FilterPanel({
     .filter(t => !tldQuery || t.includes(tldQuery.toLowerCase()));
   const selectedExtra = (filters.tlds ?? []).filter(t => !COMMON_TLDS.includes(t));
 
+  const addCustom = () => {
+    const parts = customTld.split(/[\s,，\n]+/).map(s => s.trim().replace(/^\./, "")).filter(Boolean);
+    if (!parts.length) return;
+    const merged = Array.from(new Set([...(filters.tlds ?? []), ...parts]));
+    set("tlds", merged);
+    setCustomTld("");
+  };
+
   return (
     <div className="space-y-5 text-sm">
       <Section title="关键词">
