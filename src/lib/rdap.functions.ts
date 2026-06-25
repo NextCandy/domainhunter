@@ -4,14 +4,36 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+/* ============================== LIMITS / VALIDATION ============================== */
+// Centralised bounds — also mirrored on the client (src/lib/limits.ts) so the
+// UI surfaces the same error messages before a network round-trip.
+
+export const LIMITS = {
+  qps: { min: 1, max: 200, default: 5 },
+  concurrency: { min: 1, max: 100, default: 20 },
+  perHostQps: { min: 1, max: 100, default: 10 },
+  timeoutSec: { min: 2, max: 120, default: 30 },
+  retries: { min: 0, max: 5, default: 2 },
+  batchSize: { min: 1, max: 50, default: 20 },
+  maxTotal: { min: 0, max: 2_000_000, default: 1_000_000 },
+  limit: { min: 0, max: 2_000_000, default: 0 },
+  domainsPerJob: { max: 200_000 },
+  jobNameMax: 200,
+} as const;
+
 const lookupSchema = z.object({
   domain: z
     .string()
-    .min(3)
-    .max(253)
-    .regex(/^[a-z0-9.-]+\.[a-z0-9-]+$/i, "Invalid domain")
+    .min(3, "域名过短")
+    .max(253, "域名过长")
+    .regex(/^[a-z0-9.-]+\.[a-z0-9-]+$/i, "无效的域名格式，例如 baidu.com")
     .transform((s) => s.toLowerCase()),
-  timeoutMs: z.number().int().min(2000).max(60000).optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(LIMITS.timeoutSec.min * 1000, `超时不得低于 ${LIMITS.timeoutSec.min} 秒`)
+    .max(LIMITS.timeoutSec.max * 1000, `超时不得超过 ${LIMITS.timeoutSec.max} 秒`)
+    .optional(),
 });
 
 export const lookupDomainFn = createServerFn({ method: "POST" })
@@ -43,12 +65,44 @@ export const fetchTldsFn = createServerFn({ method: "POST" })
     return [];
   });
 
-// ===== Job management =====
+/* ============================== AUDIT LOG HELPER ============================== */
+
+async function logEvent(
+  jobId: string,
+  event: string,
+  opts: {
+    level?: "info" | "warning" | "error";
+    message?: string;
+    meta?: Record<string, unknown>;
+  } = {},
+) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("job_events").insert({
+      job_id: jobId,
+      event,
+      level: opts.level || "info",
+      message: opts.message || null,
+      meta: (opts.meta as any) || null,
+    });
+  } catch (e) {
+    // Audit logging must never block job progress.
+    console.error("logEvent failed", e);
+  }
+}
+
+/* ============================== JOB MANAGEMENT ============================== */
 
 const createJobSchema = z.object({
-  name: z.string().min(1).max(200),
+  name: z
+    .string()
+    .min(1, "任务名不能为空")
+    .max(LIMITS.jobNameMax, `任务名最长 ${LIMITS.jobNameMax} 字符`),
   params: z.record(z.any()),
-  domains: z.array(z.string().min(3).max(253)).min(1).max(200_000),
+  domains: z
+    .array(z.string().min(3, "域名过短").max(253, "域名过长"))
+    .min(1, "候选域名为空")
+    .max(LIMITS.domainsPerJob.max, `单任务最多 ${LIMITS.domainsPerJob.max.toLocaleString()} 个域名`),
 });
 
 export const createJobFn = createServerFn({ method: "POST" })
@@ -65,10 +119,9 @@ export const createJobFn = createServerFn({ method: "POST" })
       })
       .select("id")
       .single();
-    if (error || !job) throw new Error(error?.message || "Failed to create job");
+    if (error || !job) throw new Error(error?.message || "创建任务失败");
     const jobId = (job as any).id as string;
 
-    // Insert items in batches of 1000
     const items = data.domains.map((d) => ({
       job_id: jobId,
       domain: d.toLowerCase(),
@@ -76,22 +129,48 @@ export const createJobFn = createServerFn({ method: "POST" })
       status: "pending",
     }));
     const batchSize = 1000;
+    let inserted = 0;
     for (let i = 0; i < items.length; i += batchSize) {
       const slice = items.slice(i, i + batchSize);
       const { error: err } = await supabaseAdmin.from("job_items").insert(slice);
       if (err && !err.message.includes("duplicate")) {
-        // Still continue; duplicates are deduped at DB by unique index
         console.error("Insert items error:", err.message);
+        await logEvent(jobId, "items_insert_error", {
+          level: "warning",
+          message: err.message,
+          meta: { batchStart: i, batchSize: slice.length },
+        });
+      } else {
+        inserted += slice.length;
       }
     }
+    await logEvent(jobId, "created", {
+      message: `任务已创建（${inserted.toLocaleString()} 个候选域名）`,
+      meta: { total: data.domains.length, inserted, params: data.params },
+    });
     return { jobId };
   });
 
 const runBatchSchema = z.object({
-  jobId: z.string().uuid(),
-  batchSize: z.number().int().min(1).max(50).default(20),
-  timeoutMs: z.number().int().min(2000).max(60000).default(20000),
-  retries: z.number().int().min(0).max(5).default(1),
+  jobId: z.string().uuid("无效的 jobId"),
+  batchSize: z
+    .number()
+    .int()
+    .min(LIMITS.batchSize.min, `批量大小至少 ${LIMITS.batchSize.min}`)
+    .max(LIMITS.batchSize.max, `批量大小最多 ${LIMITS.batchSize.max}`)
+    .default(LIMITS.batchSize.default),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(LIMITS.timeoutSec.min * 1000, `超时不得低于 ${LIMITS.timeoutSec.min} 秒`)
+    .max(LIMITS.timeoutSec.max * 1000, `超时不得超过 ${LIMITS.timeoutSec.max} 秒`)
+    .default(LIMITS.timeoutSec.default * 1000),
+  retries: z
+    .number()
+    .int()
+    .min(LIMITS.retries.min, `重试不能为负`)
+    .max(LIMITS.retries.max, `重试最多 ${LIMITS.retries.max} 次`)
+    .default(LIMITS.retries.default),
 });
 
 export const runJobBatchFn = createServerFn({ method: "POST" })
@@ -102,19 +181,21 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
 
     const { data: job } = await supabaseAdmin
       .from("jobs")
-      .select("status")
+      .select("status, started_at")
       .eq("id", data.jobId)
       .maybeSingle();
-    if (!job) throw new Error("Job not found");
+    if (!job) throw new Error("任务不存在");
     if ((job as any).status === "stopped") {
       return { processed: 0, remaining: 0, stopped: true };
     }
 
-    // Mark running
-    await supabaseAdmin
-      .from("jobs")
-      .update({ status: "running", started_at: new Date().toISOString() })
-      .eq("id", data.jobId);
+    const wasRunning = (job as any).status === "running";
+    const updates: Record<string, any> = { status: "running" };
+    if (!(job as any).started_at) updates.started_at = new Date().toISOString();
+    await supabaseAdmin.from("jobs").update(updates).eq("id", data.jobId);
+    if (!wasRunning) {
+      await logEvent(data.jobId, "started", { message: "任务开始执行" });
+    }
 
     const { data: items } = await supabaseAdmin
       .from("job_items")
@@ -129,10 +210,11 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         .from("jobs")
         .update({ status: "completed", finished_at: new Date().toISOString() })
         .eq("id", data.jobId);
+      await logEvent(data.jobId, "completed", { message: "任务已完成" });
       return { processed: 0, remaining: 0, stopped: false };
     }
 
-    // Concurrent lookups
+    const batchStart = Date.now();
     const results = await Promise.allSettled(
       pendingItems.map((it) =>
         lookupDomain(it.domain, { timeoutMs: data.timeoutMs, retries: data.retries }),
@@ -143,7 +225,8 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
       reg = 0,
       unsup = 0,
       err = 0;
-    const updates: PromiseLike<unknown>[] = [];
+    const errorSamples: { domain: string; error: string }[] = [];
+    const updatesArr: PromiseLike<unknown>[] = [];
     for (let i = 0; i < pendingItems.length; i++) {
       const it = pendingItems[i];
       const r = results[i];
@@ -164,6 +247,9 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         errMsg = String(r.reason?.message || r.reason || "error");
         info = { error: errMsg };
       }
+      if (errMsg && errorSamples.length < 5) {
+        errorSamples.push({ domain: it.domain, error: errMsg });
+      }
       const p = supabaseAdmin
         .from("job_items")
         .update({
@@ -174,11 +260,10 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         })
         .eq("id", it.id)
         .then((x) => x);
-      updates.push(p);
+      updatesArr.push(p);
     }
-    await Promise.allSettled(updates);
+    await Promise.allSettled(updatesArr);
 
-    // Bump aggregates
     const { data: cur } = await supabaseAdmin
       .from("jobs")
       .select("checked, available, registered, unsupported, errors, total")
@@ -199,7 +284,21 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         .eq("id", data.jobId);
     }
 
-    // Count remaining
+    const elapsedMs = Date.now() - batchStart;
+    await logEvent(data.jobId, "batch_done", {
+      level: err > 0 && err === pendingItems.length ? "warning" : "info",
+      message: `批量 ${pendingItems.length}：未注册 ${avail} / 已注册 ${reg} / 不支持 ${unsup} / 错误 ${err}（${elapsedMs}ms）`,
+      meta: {
+        size: pendingItems.length,
+        available: avail,
+        registered: reg,
+        unsupported: unsup,
+        errors: err,
+        elapsedMs,
+        errorSamples,
+      },
+    });
+
     const { count } = await supabaseAdmin
       .from("job_items")
       .select("id", { count: "exact", head: true })
@@ -212,12 +311,13 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         .from("jobs")
         .update({ status: "completed", finished_at: new Date().toISOString() })
         .eq("id", data.jobId);
+      await logEvent(data.jobId, "completed", { message: "任务已完成" });
     }
 
     return { processed: pendingItems.length, remaining, stopped: false };
   });
 
-const jobIdSchema = z.object({ jobId: z.string().uuid() });
+const jobIdSchema = z.object({ jobId: z.string().uuid("无效的 jobId") });
 
 export const stopJobFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => jobIdSchema.parse(data))
@@ -227,6 +327,7 @@ export const stopJobFn = createServerFn({ method: "POST" })
       .from("jobs")
       .update({ status: "stopped", finished_at: new Date().toISOString() })
       .eq("id", data.jobId);
+    await logEvent(data.jobId, "stopped", { level: "warning", message: "任务被手动停止" });
     return { ok: true };
   });
 
@@ -262,11 +363,15 @@ export const requeueErrorsFn = createServerFn({ method: "POST" })
         })
         .eq("id", data.jobId);
     }
+    await logEvent(data.jobId, "requeued_errors", {
+      message: `重新排队 ${errCount || 0} 个错误项`,
+      meta: { count: errCount || 0 },
+    });
     return { requeued: errCount || 0 };
   });
 
 const recentSchema = z.object({
-  jobId: z.string().uuid(),
+  jobId: z.string().uuid("无效的 jobId"),
   kind: z.enum(["available", "error"]),
   limit: z.number().int().min(1).max(500).default(100),
 });
@@ -305,4 +410,72 @@ export const getJobFn = createServerFn({ method: "POST" })
       .eq("id", data.jobId)
       .maybeSingle();
     return job as any;
+  });
+
+/* ============================== AUDIT LOG QUERIES ============================== */
+
+const listEventsSchema = z.object({
+  jobId: z.string().uuid("无效的 jobId"),
+  level: z.enum(["all", "info", "warning", "error"]).default("all"),
+  limit: z.number().int().min(1).max(500).default(100),
+});
+
+export interface JobEvent {
+  id: number;
+  job_id: string;
+  level: "info" | "warning" | "error";
+  event: string;
+  message: string | null;
+  meta: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export const listJobEventsFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => listEventsSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin
+      .from("job_events")
+      .select("id, job_id, level, event, message, meta, created_at")
+      .eq("job_id", data.jobId)
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.level !== "all") q = q.eq("level", data.level);
+    const { data: rows } = await q;
+    return (rows || []) as unknown as JobEvent[];
+  });
+
+const errorReportSchema = z.object({
+  jobId: z.string().uuid("无效的 jobId"),
+  limit: z.number().int().min(1).max(5000).default(1000),
+});
+
+export const jobErrorReportFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => errorReportSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows } = await supabaseAdmin
+      .from("job_items")
+      .select("domain, tld, error, checked_at")
+      .eq("job_id", data.jobId)
+      .eq("status", "error")
+      .order("checked_at", { ascending: false })
+      .limit(data.limit);
+    // Group by error reason
+    const buckets = new Map<string, { count: number; sampleDomains: string[] }>();
+    for (const r of (rows || []) as any[]) {
+      const key = (r.error || "unknown").slice(0, 200);
+      const b = buckets.get(key) || { count: 0, sampleDomains: [] };
+      b.count++;
+      if (b.sampleDomains.length < 5) b.sampleDomains.push(r.domain);
+      buckets.set(key, b);
+    }
+    const grouped = [...buckets.entries()]
+      .map(([reason, v]) => ({ reason, ...v }))
+      .sort((a, b) => b.count - a.count);
+    return {
+      total: rows?.length || 0,
+      grouped,
+      items: rows as any[],
+    };
   });
