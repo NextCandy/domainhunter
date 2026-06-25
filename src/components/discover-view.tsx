@@ -1,10 +1,12 @@
 // Shared Discover view used by /discover, /deleted, /pending.
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Filter, RefreshCw, Search, X } from "lucide-react";
+import { Filter, RefreshCw, Search, Sparkles, X } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
 import { discoverFn, toggleWatchFn, refreshDomainFn, type DiscoverFilters } from "@/lib/discover.functions";
+import { createEnrichJobFn } from "@/lib/enrich-jobs.functions";
 import { toast } from "sonner";
 
 const BASE: DiscoverFilters = { page: 1, pageSize: 50, sortBy: "score", sortDir: "desc" };
