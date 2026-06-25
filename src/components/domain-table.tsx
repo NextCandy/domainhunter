@@ -98,6 +98,23 @@ export function FilterPanel({
       </Section>
 
       <Section title={`后缀${filters.tlds?.length ? ` · 已选 ${filters.tlds.length}` : ""}`}>
+        {/* 批量快捷操作 */}
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...COMMON_TLDS])))}
+            className="rounded-md border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/10">全选</button>
+          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["com","net","org","io","ai","co","app","dev","xyz"]])))}
+            className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 热门 gTLD</button>
+          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["cn","com.cn","net.cn","hk","tw","jp","kr","sg"]])))}
+            className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 亚洲 ccTLD</button>
+          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["de","uk","co.uk","fr","it","es","nl","ch","se","no","fi","dk","pl","be","at","ie"]])))}
+            className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 欧洲 ccTLD</button>
+          <button type="button" onClick={() => set("tlds", Array.from(new Set([...(filters.tlds ?? []), ...["to","is","im","li","la","fm","gg","so","ws","cc","tv","me"]])))}
+            className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:border-border-strong">+ 极客短</button>
+          {(filters.tlds?.length ?? 0) > 0 && (
+            <button type="button" onClick={() => set("tlds", undefined)}
+              className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground">清空</button>
+          )}
+        </div>
         <input
           value={tldQuery}
           onChange={e => setTldQuery(e.target.value)}
@@ -125,21 +142,19 @@ export function FilterPanel({
             {tldExpanded ? "收起" : `展开全部 ${COMMON_TLDS.length} 个后缀 →`}
           </button>
         )}
-        <div className="mt-2 flex gap-1.5">
-          <input
-            value={customTld}
-            onChange={e => setCustomTld(e.target.value.toLowerCase().replace(/[^a-z0-9.]/g, ""))}
-            placeholder="自定义后缀"
-            className="field flex-1 text-xs"
-          />
-          <button type="button"
-            onClick={() => {
-              const v = customTld.trim().replace(/^\./, "");
-              if (!v) return;
-              if (!filters.tlds?.includes(v)) toggle("tlds", v);
-              setCustomTld("");
-            }}
-            className="btn-base btn-ghost !py-1 text-xs">加入</button>
+        <div className="mt-2 space-y-1.5">
+          <div className="flex gap-1.5">
+            <input
+              value={customTld}
+              onChange={e => setCustomTld(e.target.value.toLowerCase().replace(/[^a-z0-9.,\s]/g, ""))}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
+              placeholder="批量粘贴：com, net, io 或换行分隔"
+              className="field flex-1 text-xs"
+            />
+            <button type="button" onClick={addCustom}
+              className="btn-base btn-ghost !py-1 text-xs">加入</button>
+          </div>
+          <div className="text-[11px] text-muted-foreground">支持逗号/空格/换行分隔的批量后缀</div>
         </div>
       </Section>
 
