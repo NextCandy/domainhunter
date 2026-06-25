@@ -1,52 +1,60 @@
-# 域名批量查询工具复刻方案
+## DomainHunter 升级计划：从批量查询工具 → 过期域名发现平台
 
-## 技术架构
-- **前端**：TanStack Start + Tailwind v4，现代化重设计（深色 + 单色精致排版）
-- **后端**：Lovable Cloud (Supabase) 存储任务/结果；TanStack server functions 调用 RDAP/WHOIS
-- **任务执行**：UI 触发批处理 server function（每批 N 个域名），客户端轮询进度。任务状态完全持久化，刷新页面/重新打开可继续
+当前项目是一个域名批量 RDAP 查询工具（带任务队列、审计日志）。本计划将其升级为一个完整的过期域名发现/筛选/评分/观察平台，参考 ExpiredDomains 的产品结构（不抓取其数据）。
 
-> Cloudflare Workers 无常驻进程，所以"关闭网页后台继续跑"用如下策略：任务状态在 DB；用户重新打开页面会自动恢复并继续推进。
+### 一、范围与 MVP 优先级
 
-## 数据库（Supabase）
-- `jobs`：id, name, params(jsonb), status, totals(checked/available/registered/unsupported/errors), created_at
-- `job_items`：id, job_id, domain, status(pending/available/registered/unsupported/error), info(jsonb), error
-- `tlds_cache`：RDAP bootstrap 缓存
+考虑到工作量巨大，采用分阶段交付。**本次先交付 MVP（阶段 1+2），其余阶段后续按需推进。**
 
-## 功能清单
-1. **单域名查询卡片**：实时 RDAP，显示注册商/注册日/到期日/DNS/DNSSEC/来源
-2. **新建任务表单**：
-   - 域名格式：LLLL/LLL/NNNN/NNN/mixed3/自定义（L=字母 N=数字 A=字母数字 小写=固定）
-   - 候选词/完整域名列表（带点直查）
-   - 后缀来源：自定义/常用/全部 RDAP/全部 IANA 根区/按长度筛选
-   - 过滤：开头/末尾/包含/正则；必须含字母/数字
-   - QPS/并发/单主机 QPS/limit/max_total/超时/重试
-   - 估算数量按钮
-3. **任务面板**：实时进度（已查询/未注册/已注册/不支持/错误/速度），停止、补扫错误项
-4. **下载**：available.txt / all_results.tsv / errors.txt（服务端导出）
-5. **最近未注册/错误列表**：可一键复制
-6. **数量参考表**
+**阶段 1（核心数据层 + 评分）**
+- 新建数据模型：`domains`、`domain_metrics`、`domain_whois`、`domain_dns`、`watchlist`、`registrars`、`data_sources`（与现有 `jobs`/`job_items`/`job_events` 共存）
+- 评分引擎：100 分制规则化模型（长度/语义/后缀/Archive/外链/相关后缀/风险扣分），可在 `/admin/scoring` 调整权重
+- 数据导入：TXT/CSV 导入 → 写入 `domains` → 自动入队 RDAP 检查 → 评分
+- 复用现有 RDAP 引擎做"可注册"检测，结果写入 `domains.status` + `domain_whois`
 
-## RDAP 实现
-- 启动时从 `https://data.iana.org/rdap/dns.json` 拉 bootstrap → 缓存
-- 查询：根据 TLD 找 RDAP 服务器 → GET `/domain/{name}`
-  - 404 → available
-  - 200 → registered（解析 entities/dates/nameservers）
-  - 无 RDAP → fallback 到 IANA WHOIS（HTTP gateway 或标记 unsupported）
+**阶段 2（核心 UI）**
+- 浅色风格重设计（背景 #F6F8FB / 主色 #2563EB），保留终端式工具作为子页 `/tools/batch-rdap`
+- 新顶部导航：DomainHunter / 发现 / 已删除 / 待删除 / 拍卖 / 观察 / 我的域名 / 后台
+- `/` 首页：搜索框 + 5 张概览卡（今日新增 / 可注册 / 待删除 / 高分 / 观察中）+ 推荐域名列表
+- `/discover` 发现页：左侧筛选器（后缀、长度、状态、字符类型、关键词、正则、最低评分、Archive 年份、外链、删除时间），右侧服务端分页表格（综合评分、状态、BL、DP、ABY、删除时间、操作）。移动端筛选器改为底部抽屉、列表改为卡片
+- `/deleted`、`/pending`、`/auctions`：基于 `/discover` 的预设过滤视图（拍卖表保留 platform/price/end_time 字段但暂不接入真实 API）
+- `/watchlist`：观察列表 CRUD + 标签 + 备注 + 提醒开关（提醒触发通道留接口，不发邮件）
+- `/domains/:domain` 详情页：基础信息 + WHOIS/RDAP + DNS（占位） + Archive/SEO（占位） + 相关后缀检查（实时复用 RDAP）
+- `/my-domains`：已购域名管理（手动录入）
 
-## UI 设计
-- 单一深色画布 `oklch(0.18 0.01 240)`，单色强调（电光青 `oklch(0.78 0.18 200)`）
-- 显示字体 JetBrains Mono（终端感）+ 正文 Inter
-- 卡片：1px 描边、无阴影、清晰分区
-- 实时数字大字号、等宽
+**阶段 3（后台 + 任务，本次仅留入口与最小实现）**
+- `/admin/sources`：TXT/CSV 导入 UI（启用）
+- `/admin/scoring`：评分权重编辑（启用）
+- `/admin/settings`：站点名/主题色/通知开关（启用，仅本地保存）
+- `/admin/registrars`、`/admin/jobs`：UI 骨架 + 配置存储（密钥用 base64 占位加密，真实接入留待后续）
 
-## 路由
-- `/` 主页（所有功能在一页，对应原站）
-- `/api/public/jobs/$id/download/$kind` 文件下载
+**阶段 4（暂不在本次交付）**
+- 真实 SEO/Archive API 接入（Ahrefs / Wayback 真实查询）
+- 注册商 API 真实下单
+- 邮件 / Telegram / Bark / Webhook 通知发送
+- 用户系统（本次假定单用户/匿名，沿用现有匿名 RLS）
 
-## 实施顺序
-1. 启用 Cloud + 创建数据库表
-2. 设计系统 + 主页骨架 + 单域名查询
-3. RDAP 服务端函数
-4. 新建任务 + 候选词生成 + 持久化
-5. 批处理引擎 + 进度面板
-6. 下载端点 + 复制列表
+### 二、技术要点
+
+- **栈**：保留 TanStack Start + Lovable Cloud（Supabase）+ Tailwind v4
+- **路由**：在 `src/routes/` 新增 `discover.tsx`、`deleted.tsx`、`pending.tsx`、`auctions.tsx`、`watchlist.tsx`、`my-domains.tsx`、`domains.$domain.tsx`、`admin.tsx`（layout）+ admin 子路由、`tools.batch-rdap.tsx`（迁移现有 `index.tsx` 内容）
+- **服务端函数**：`src/lib/discover.functions.ts`（分页查询 + 多列筛选/排序）、`src/lib/scoring.ts`（纯函数评分）、`src/lib/import.functions.ts`（导入 + 入队）、`src/lib/watchlist.functions.ts`
+- **性能**：服务端分页（默认 50/页），筛选字段建索引（domain/tld/status/score/length/drop_date/archive_year/backlinks/risk_level）
+- **安全**：注册商密钥字段命名 `*_encrypted`、`/admin/*` 暂用单一访问密码门控（写入 localStorage + server 校验环境变量，未配置时允许本地访问并显示提示）
+- **设计令牌**：在 `src/styles.css` 重写 oklch 令牌为浅色面板风格
+
+### 三、文件改动概览
+
+- 新建迁移：domains/metrics/whois/dns/watchlist/registrars/data_sources/scoring_rules（含 GRANT + RLS + 索引）
+- 新建 `src/lib/scoring.ts`、`src/lib/discover.functions.ts`、`src/lib/import.functions.ts`、`src/lib/watchlist.functions.ts`、`src/lib/admin.functions.ts`
+- 新建路由若干（见上）；将现有 `src/routes/index.tsx` 拆为新 `index.tsx`（概览）+ `tools.batch-rdap.tsx`（保留原全部功能）
+- 新建组件：`AppShell`（顶部导航）、`StatCard`、`DomainTable`、`DomainCardMobile`、`FilterPanel`、`FilterDrawer`、`ScoreBadge`、`RiskBadge`
+- `src/styles.css`：浅色主题令牌
+- `src/routes/__root.tsx`：使用 `AppShell` 包裹
+
+### 四、明确不做
+
+- 不爬取 ExpiredDomains 任何数据；所有"已删除/待删除/拍卖"数据均来自用户导入或现有 RDAP 检测结果
+- 不接入真实 Ahrefs/Majestic/Wayback API（字段保留，值为空或 0）
+- 不实现自动抢注/自动购买
+- 不实现真实通知发送
