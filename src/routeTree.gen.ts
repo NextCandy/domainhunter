@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WatchlistRouteImport } from './routes/watchlist'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PendingRouteImport } from './routes/pending'
 import { Route as MyDomainsRouteImport } from './routes/my-domains'
 import { Route as IdeasRouteImport } from './routes/ideas'
@@ -30,6 +31,7 @@ import { Route as AdminSourcesRouteImport } from './routes/admin.sources'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminScoringRouteImport } from './routes/admin.scoring'
 import { Route as AdminRegistrarsRouteImport } from './routes/admin.registrars'
+import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
 import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as AdminHistoryRouteImport } from './routes/admin.history'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
@@ -38,6 +40,11 @@ import { Route as ApiPublicEnrichIdDownloadRouteImport } from './routes/api/publ
 const WatchlistRoute = WatchlistRouteImport.update({
   id: '/watchlist',
   path: '/watchlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PendingRoute = PendingRouteImport.update({
@@ -140,6 +147,11 @@ const AdminRegistrarsRoute = AdminRegistrarsRouteImport.update({
   path: '/registrars',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminPricingRoute = AdminPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminJobsRoute = AdminJobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
@@ -174,9 +186,11 @@ export interface FileRoutesByFullPath {
   '/ideas': typeof IdeasRoute
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
+  '/pricing': typeof PricingRoute
   '/watchlist': typeof WatchlistRoute
   '/admin/history': typeof AdminHistoryRoute
   '/admin/jobs': typeof AdminJobsRoute
+  '/admin/pricing': typeof AdminPricingRoute
   '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -200,9 +214,11 @@ export interface FileRoutesByTo {
   '/ideas': typeof IdeasRoute
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
+  '/pricing': typeof PricingRoute
   '/watchlist': typeof WatchlistRoute
   '/admin/history': typeof AdminHistoryRoute
   '/admin/jobs': typeof AdminJobsRoute
+  '/admin/pricing': typeof AdminPricingRoute
   '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -228,9 +244,11 @@ export interface FileRoutesById {
   '/ideas': typeof IdeasRoute
   '/my-domains': typeof MyDomainsRoute
   '/pending': typeof PendingRoute
+  '/pricing': typeof PricingRoute
   '/watchlist': typeof WatchlistRoute
   '/admin/history': typeof AdminHistoryRoute
   '/admin/jobs': typeof AdminJobsRoute
+  '/admin/pricing': typeof AdminPricingRoute
   '/admin/registrars': typeof AdminRegistrarsRoute
   '/admin/scoring': typeof AdminScoringRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -257,9 +275,11 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/my-domains'
     | '/pending'
+    | '/pricing'
     | '/watchlist'
     | '/admin/history'
     | '/admin/jobs'
+    | '/admin/pricing'
     | '/admin/registrars'
     | '/admin/scoring'
     | '/admin/settings'
@@ -283,9 +303,11 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/my-domains'
     | '/pending'
+    | '/pricing'
     | '/watchlist'
     | '/admin/history'
     | '/admin/jobs'
+    | '/admin/pricing'
     | '/admin/registrars'
     | '/admin/scoring'
     | '/admin/settings'
@@ -310,9 +332,11 @@ export interface FileRouteTypes {
     | '/ideas'
     | '/my-domains'
     | '/pending'
+    | '/pricing'
     | '/watchlist'
     | '/admin/history'
     | '/admin/jobs'
+    | '/admin/pricing'
     | '/admin/registrars'
     | '/admin/scoring'
     | '/admin/settings'
@@ -338,6 +362,7 @@ export interface RootRouteChildren {
   IdeasRoute: typeof IdeasRoute
   MyDomainsRoute: typeof MyDomainsRoute
   PendingRoute: typeof PendingRoute
+  PricingRoute: typeof PricingRoute
   WatchlistRoute: typeof WatchlistRoute
   DomainsDomainRoute: typeof DomainsDomainRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
@@ -352,6 +377,13 @@ declare module '@tanstack/react-router' {
       path: '/watchlist'
       fullPath: '/watchlist'
       preLoaderRoute: typeof WatchlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pending': {
@@ -494,6 +526,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRegistrarsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/pricing': {
+      id: '/admin/pricing'
+      path: '/pricing'
+      fullPath: '/admin/pricing'
+      preLoaderRoute: typeof AdminPricingRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/jobs': {
       id: '/admin/jobs'
       path: '/jobs'
@@ -528,6 +567,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminHistoryRoute: typeof AdminHistoryRoute
   AdminJobsRoute: typeof AdminJobsRoute
+  AdminPricingRoute: typeof AdminPricingRoute
   AdminRegistrarsRoute: typeof AdminRegistrarsRoute
   AdminScoringRoute: typeof AdminScoringRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -540,6 +580,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminHistoryRoute: AdminHistoryRoute,
   AdminJobsRoute: AdminJobsRoute,
+  AdminPricingRoute: AdminPricingRoute,
   AdminRegistrarsRoute: AdminRegistrarsRoute,
   AdminScoringRoute: AdminScoringRoute,
   AdminSettingsRoute: AdminSettingsRoute,
@@ -573,6 +614,7 @@ const rootRouteChildren: RootRouteChildren = {
   IdeasRoute: IdeasRoute,
   MyDomainsRoute: MyDomainsRoute,
   PendingRoute: PendingRoute,
+  PricingRoute: PricingRoute,
   WatchlistRoute: WatchlistRoute,
   DomainsDomainRoute: DomainsDomainRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
