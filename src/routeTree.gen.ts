@@ -15,6 +15,7 @@ import { Route as MyDomainsRouteImport } from './routes/my-domains'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as DeletedRouteImport } from './routes/deleted'
 import { Route as AuctionsRouteImport } from './routes/auctions'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as DomainsDomainRouteImport } from './routes/domains.$domain'
@@ -50,6 +51,11 @@ const AuctionsRoute = AuctionsRouteImport.update({
   path: '/auctions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -74,6 +80,7 @@ const ApiPublicJobsJobIdDownloadRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
@@ -99,6 +107,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auctions': typeof AuctionsRoute
   '/deleted': typeof DeletedRoute
   '/discover': typeof DiscoverRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auctions'
     | '/deleted'
     | '/discover'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auctions'
     | '/deleted'
     | '/discover'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auctions'
     | '/deleted'
     | '/discover'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AuctionsRoute: typeof AuctionsRoute
   DeletedRoute: typeof DeletedRoute
   DiscoverRoute: typeof DiscoverRoute
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuctionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -238,6 +258,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AuctionsRoute: AuctionsRoute,
   DeletedRoute: DeletedRoute,
   DiscoverRoute: DiscoverRoute,
