@@ -540,7 +540,7 @@ export const sendTestNotificationFn = createServerFn({ method: "POST" })
 
 // ───────── Live batch scan (Discover 页「批量查询」实际触发) ─────────
 const LiveScanSchema = z.object({
-  tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).min(1).max(50),
+  tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).min(1).max(300),
   names: z.array(z.string().min(1).max(40)).max(200).optional(),
   q: z.string().max(40).optional(),
   startsWith: z.string().max(20).optional(),
