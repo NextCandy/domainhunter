@@ -7,6 +7,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { scoreDomain, classifyDomain, DEFAULT_WEIGHTS, type ScoringWeights } from "./scoring";
 import { lookupDomain } from "./rdap.server";
 import { fetchDns, fetchArchive, sendNotification } from "./enrich.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { assertAdmin } from "./admin-guard.server";
 
 function sbAdmin() {
   return createClient<Database>(
