@@ -5,6 +5,7 @@ import { useAuth, signOut } from "@/lib/auth-client";
 
 const NAV = [
   { to: "/", label: "概览" },
+  { to: "/ideas", label: "域名灵感" },
   { to: "/discover", label: "发现域名" },
   { to: "/deleted", label: "已删除" },
   { to: "/pending", label: "待删除" },
