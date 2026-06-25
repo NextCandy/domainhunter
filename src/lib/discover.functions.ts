@@ -165,7 +165,7 @@ async function refreshOneInternal(domain: string) {
   const parsed = parseDomain(domain);
   if (!parsed) throw new Error("Invalid domain");
   const weights = await getWeights();
-  const lookup = await performLookup(parsed.domain);
+  const lookup = await lookupDomain(parsed.domain);
   const status =
     lookup.status === "available" ? "available" :
     lookup.status === "registered" ? "registered" :
@@ -249,7 +249,7 @@ export const checkRelatedTldsFn = createServerFn({ method: "POST" })
     const tlds = ["com", "net", "org", "io", "ai", "co", "cc", "cn"];
     const results = await Promise.all(tlds.map(async tld => {
       try {
-        const r = await performLookup(`${data.name}.${tld}`);
+        const r = await lookupDomain(`${data.name}.${tld}`);
         return { tld, status: r.status };
       } catch { return { tld, status: "unknown" as const }; }
     }));
