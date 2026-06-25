@@ -7,7 +7,7 @@ import { AppShell, PageHeader } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
 import { discoverFn, toggleWatchFn, refreshDomainFn, liveScanFn, getTldListFn, type DiscoverFilters } from "@/lib/discover.functions";
 import { createEnrichJobFn } from "@/lib/enrich-jobs.functions";
-import { lookupDomainFn, runJobBatchFn, requeueErrorsFn, jobProgressFn } from "@/lib/rdap.functions";
+import { lookupDomainFn, runJobBatchFn, requeueErrorsFn, jobProgressFn, recentItemsFn } from "@/lib/rdap.functions";
 import { toast } from "sonner";
 
 const BASE: DiscoverFilters = { page: 1, pageSize: 50, sortBy: "score", sortDir: "desc" };
@@ -100,11 +100,14 @@ export function DiscoverView({
     placeholderData: (prev) => prev,
   });
 
-  // 后台可配置的 TLD 列表
+  // 后台可配置的 TLD 列表 — 进入页面/窗口聚焦/每 30s 自动刷新
   const { data: tldData } = useQuery({
     queryKey: ["tld-list"],
     queryFn: () => getTldListFn(),
-    staleTime: 60_000,
+    staleTime: 10_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 30_000,
   });
 
   const watchMut = useMutation({
