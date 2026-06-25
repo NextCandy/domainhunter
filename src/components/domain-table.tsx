@@ -81,6 +81,16 @@ export function FilterPanel({
   const set = <K extends keyof DiscoverFilters>(key: K, value: DiscoverFilters[K]) =>
     onChange({ ...filters, [key]: value, page: 1 });
 
+  // 统一去重 + 规范化 TLD 列表
+  const setTlds = (list: string[] | undefined) => {
+    if (!list || !list.length) { set("tlds", undefined); return; }
+    const norm = list
+      .map(t => t.trim().toLowerCase().replace(/^\./, ""))
+      .filter(t => /^[a-z0-9.\-]+$/.test(t));
+    const dedup = Array.from(new Set(norm));
+    set("tlds", dedup.length ? dedup : undefined);
+  };
+
   const visibleTlds = (tldExpanded ? COMMON_TLDS : COMMON_TLDS.slice(0, 18))
     .filter(t => !tldQuery || t.includes(tldQuery.toLowerCase()));
   const selectedExtra = (filters.tlds ?? []).filter(t => !COMMON_TLDS.includes(t));
@@ -88,9 +98,28 @@ export function FilterPanel({
   const addCustom = () => {
     const parts = customTld.split(/[\s,，\n]+/).map(s => s.trim().replace(/^\./, "")).filter(Boolean);
     if (!parts.length) return;
-    const merged = Array.from(new Set([...(filters.tlds ?? []), ...parts]));
-    set("tlds", merged);
+    const before = filters.tlds?.length ?? 0;
+    setTlds([...(filters.tlds ?? []), ...parts]);
+    const added = parts.filter(p => !(filters.tlds ?? []).includes(p.toLowerCase())).length;
+    const dup = parts.length - added;
+    if (typeof window !== "undefined") {
+      import("sonner").then(({ toast }) => {
+        toast.success(`已加入 ${added} 个后缀${dup ? `，去重 ${dup} 个` : ""}（共 ${before + added}）`);
+      });
+    }
     setCustomTld("");
+  };
+
+  const runBatchSearch = () => {
+    const n = filters.tlds?.length ?? 0;
+    if (!n) {
+      import("sonner").then(({ toast }) => toast.error("请先选择至少 1 个后缀"));
+      return;
+    }
+    const ok = typeof window === "undefined"
+      ? true
+      : window.confirm(`将按 ${n} 个 TLD 进行批量查询。\n预计返回最多 ${filters.pageSize ?? 50} 条/页（数据库现有匹配记录）。\n确定开始？`);
+    if (ok && onSearch) onSearch();
   };
 
   return (
