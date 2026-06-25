@@ -537,3 +537,55 @@ export const sendTestNotificationFn = createServerFn({ method: "POST" })
     if (!res.length) throw new Error("请先填写 Bark 或 Webhook URL");
     return { results: res };
   });
+
+// ───────── Live batch scan (Discover 页「批量查询」实际触发) ─────────
+const LiveScanSchema = z.object({
+  tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).min(1).max(50),
+  names: z.array(z.string().min(1).max(40)).max(200).optional(),
+  q: z.string().max(40).optional(),
+  startsWith: z.string().max(20).optional(),
+  endsWith: z.string().max(20).optional(),
+  contains: z.string().max(20).optional(),
+  limit: z.number().int().min(1).max(500).default(200),
+});
+
+export const liveScanFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => LiveScanSchema.parse(d))
+  .handler(async ({ data }) => {
+    // 1) 决定要查询的「名字」候选集
+    let names: string[] = (data.names ?? [])
+      .map(n => n.trim().toLowerCase())
+      .filter(n => /^[a-z0-9-]+$/.test(n));
+    if (!names.length) {
+      const seed = (data.q || data.contains || data.startsWith || data.endsWith || "").trim().toLowerCase();
+      if (!seed || !/^[a-z0-9-]+$/.test(seed)) {
+        throw new Error("请填写关键词/开头/结尾/包含 任一，或在「关键词」中提供候选名");
+      }
+      names = [seed];
+    }
+    // 2) 生成 name × tld 候选
+    const tlds = Array.from(new Set(data.tlds.map(t => t.toLowerCase().replace(/^\./, ""))));
+    const candidates: string[] = [];
+    for (const n of names) for (const t of tlds) {
+      candidates.push(`${n}.${t}`);
+      if (candidates.length >= data.limit) break;
+      // eslint-disable-next-line no-unreachable-loop
+    }
+    const list = candidates.slice(0, data.limit);
+    // 3) 并发 RDAP + upsert
+    let available = 0, registered = 0, unknown = 0, errors = 0;
+    const CONC = 8;
+    let i = 0;
+    await Promise.all(Array.from({ length: CONC }, async () => {
+      while (i < list.length) {
+        const d = list[i++];
+        try {
+          const r = await refreshOneInternal(d);
+          if (r.status === "available") available++;
+          else if (r.status === "registered") registered++;
+          else unknown++;
+        } catch { errors++; }
+      }
+    }));
+    return { scanned: list.length, available, registered, unknown, errors };
+  });
