@@ -406,7 +406,7 @@ export const listSourcesFn = createServerFn({ method: "GET" }).handler(async () 
 
 export const upsertSourceFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({
-    id: z.number().int().optional(),
+    id: z.coerce.number().int().optional(),
     name: z.string().min(1).max(80),
     type: z.string().max(30).default("manual"),
     url: z.string().max(500).optional(),
@@ -459,8 +459,9 @@ export const upsertRegistrarFn = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data }) => {
     const sb = sbAdmin();
+    const name = data.name.trim();
     const patch: any = {
-      name: data.name, enabled: data.enabled,
+      name, enabled: data.enabled,
       buy_url_template: data.buy_url_template ?? null,
     };
     if (data.api_key) patch.api_key_encrypted = pseudoEncrypt(data.api_key);
@@ -469,8 +470,23 @@ export const upsertRegistrarFn = createServerFn({ method: "POST" })
       const { error } = await sb.from("registrars").update(patch).eq("id", data.id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await sb.from("registrars").insert(patch);
-      if (error) throw new Error(error.message);
+      const { data: existing, error: findError } = await sb
+        .from("registrars")
+        .select("id,name")
+        .ilike("name", name)
+        .maybeSingle();
+      if (findError) throw new Error(findError.message);
+
+      if (existing?.id) {
+        const { error } = await sb
+          .from("registrars")
+          .update({ ...patch, name: existing.name ?? name })
+          .eq("id", existing.id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await sb.from("registrars").insert(patch);
+        if (error) throw new Error(error.message);
+      }
     }
     return { ok: true };
   });
