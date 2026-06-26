@@ -269,9 +269,16 @@ export const checkRelatedTldsFn = createServerFn({ method: "POST" })
 export const listWatchlistFn = createServerFn({ method: "GET" }).handler(async () => {
   const sb = sbAdmin();
   const { data, error } = await sb.from("watchlist")
-    .select("*, domain:domains(*)").order("created_at", { ascending: false }).limit(500);
+    .select("*").order("created_at", { ascending: false }).limit(500);
   if (error) throw new Error(error.message);
-  return data ?? [];
+  const rows = (data as any[]) ?? [];
+  const ids = rows.map((r) => r.domain_id).filter(Boolean);
+  let byId = new Map<string, any>();
+  if (ids.length) {
+    const { data: doms } = await sb.from("domains").select("*").in("id", ids);
+    for (const d of (doms as any[]) ?? []) byId.set(d.id, d);
+  }
+  return rows.map((r) => ({ ...r, domain: byId.get(r.domain_id) ?? null }));
 });
 
 export const toggleWatchFn = createServerFn({ method: "POST" })
