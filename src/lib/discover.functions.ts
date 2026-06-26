@@ -450,7 +450,7 @@ function pseudoEncrypt(plain: string) {
 
 export const upsertRegistrarFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({
-    id: z.number().int().optional(),
+    id: z.coerce.number().int().optional(),
     name: z.string().min(1).max(80),
     api_key: z.string().max(500).optional(),
     api_secret: z.string().max(500).optional(),
@@ -492,7 +492,7 @@ export const upsertRegistrarFn = createServerFn({ method: "POST" })
   });
 
 export const deleteRegistrarFn = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.number().int() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.coerce.number().int() }).parse(d))
   .handler(async ({ data }) => {
     const sb = sbAdmin();
     await sb.from("registrars").delete().eq("id", data.id);
