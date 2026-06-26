@@ -14,7 +14,7 @@ export const listUsersFn = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id, role");
     const adminSet = new Set((roles ?? []).filter((r: any) => r.role === "admin").map((r: any) => r.user_id));
-    return users.users.map(u => ({
+    return users.users.map((u: any) => ({
       id: u.id,
       email: u.email,
       created_at: u.created_at,

@@ -96,7 +96,7 @@ function EnrichDetailPage() {
           <table className="w-full text-xs">
             <thead><tr className="text-left text-muted-foreground"><th>域名</th><th>类型</th><th>状态</th><th>时间</th></tr></thead>
             <tbody>
-              {data.recent.map(r => (
+              {data.recent.map((r: any) => (
                 <tr key={r.id} className="border-t border-border">
                   <td className="py-1 font-mono">{r.domain}</td>
                   <td className="py-1">{r.kind}</td>
@@ -110,7 +110,7 @@ function EnrichDetailPage() {
         <Section title="错误明细">
           {data.errors.length === 0 ? <p className="text-xs text-muted-foreground">暂无错误</p> : (
             <ul className="space-y-1 text-xs">
-              {data.errors.map(e => (
+              {data.errors.map((e: any) => (
                 <li key={e.id} className="rounded border border-destructive/20 bg-destructive/5 p-2">
                   <div className="font-mono">{e.domain} <span className="text-muted-foreground">/ {e.kind}</span></div>
                   <div className="mt-0.5 text-destructive">{e.error}</div>

@@ -188,7 +188,7 @@ export const advanceEnrichJobFn = createServerFn({ method: "POST" })
       updates.push(
         supabaseAdmin.from("enrich_items").update({
           status, result, error, attempted_at: new Date().toISOString(),
-        }).eq("id", it.id).then(x => x),
+        }).eq("id", it.id).then((x: any) => x),
       );
     }
     await Promise.allSettled(updates);

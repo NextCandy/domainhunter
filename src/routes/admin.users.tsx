@@ -42,7 +42,7 @@ function AdminUsersPage() {
         </thead>
         <tbody>
           {isLoading && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">加载中…</td></tr>}
-          {(data ?? []).map(u => (
+          {(data ?? []).map((u: any) => (
             <tr key={u.id} className="border-t border-border">
               <td className="px-3 py-2 font-medium">{u.email ?? "—"}</td>
               <td className="px-3 py-2 text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleString() : "—"}</td>
