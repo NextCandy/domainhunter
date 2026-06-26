@@ -2,7 +2,7 @@
 // my-domains, admin (scoring + settings + sources + registrars), single-domain refresh.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
+import { pgShim } from "./pg-shim.server";
 import type { Database } from "@/integrations/supabase/types";
 import { scoreDomain, classifyDomain, DEFAULT_WEIGHTS, type ScoringWeights } from "./scoring";
 import { lookupDomain } from "./rdap.server";
@@ -11,11 +11,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertAdmin } from "./admin-guard.server";
 
 function sbAdmin() {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  return pgShim;
 }
 
 const TLD_SAFE = /^[a-z0-9-]+$/i;
