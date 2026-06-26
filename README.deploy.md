@@ -166,6 +166,16 @@ If Docker reports `Bind mount failed: ... data/pg does not exist`, create the di
 mkdir -p data/pg
 ```
 
+### TLD save JSON error
+
+If saving the suffix/TLD list reports:
+
+```text
+invalid input syntax for type json
+```
+
+Update to the current code. The admin save path now serializes the TLD list before writing it to the JSONB `app_settings.value` column.
+
 ### App cannot be reached from LAN
 
 Check:

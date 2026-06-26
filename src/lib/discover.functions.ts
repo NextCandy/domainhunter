@@ -667,7 +667,7 @@ export const saveTldListFn = createServerFn({ method: "POST" })
       data.tlds.map(t => t.trim().toLowerCase().replace(/^\./, "")).filter(Boolean),
     ));
     const { error } = await sb.from("app_settings").upsert({
-      key: "tld_list", value: dedup as any, updated_at: new Date().toISOString(),
+      key: "tld_list", value: JSON.stringify(dedup) as any, updated_at: new Date().toISOString(),
     });
     if (error) throw new Error(error.message);
     return { ok: true, count: dedup.length };

@@ -221,6 +221,10 @@ Create the host data directory before starting:
 mkdir -p data/pg
 ```
 
+### `invalid input syntax for type json` when saving TLDs
+
+Update to the current code. The TLD admin page stores `app_settings.value` as JSONB, so the server serializes the TLD array before writing it to PostgreSQL.
+
 ### Port conflict
 
 Do not stop unrelated containers. Choose a new app port:
