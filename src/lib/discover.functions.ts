@@ -2,7 +2,7 @@
 // my-domains, admin (scoring + settings + sources + registrars), single-domain refresh.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { createClient } from "@supabase/supabase-js";
+import { pgShim } from "./pg-shim.server";
 import type { Database } from "@/integrations/supabase/types";
 import { scoreDomain, classifyDomain, DEFAULT_WEIGHTS, type ScoringWeights } from "./scoring";
 import { lookupDomain } from "./rdap.server";
@@ -11,11 +11,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertAdmin } from "./admin-guard.server";
 
 function sbAdmin() {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  return pgShim;
 }
 
 const TLD_SAFE = /^[a-z0-9-]+$/i;
@@ -91,7 +87,7 @@ export const discoverFn = createServerFn({ method: "POST" })
     const sb = sbAdmin();
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
-    let q = sb.from("domains").select("*, metrics:domain_metrics(*)", { count: "exact" });
+    let q = sb.from("domains").select("*", { count: "exact" });
     if (data.q) q = q.ilike("domain", `%${data.q}%`);
     if (data.tlds?.length) q = q.in("tld", data.tlds);
     if (data.statuses?.length) q = q.in("status", data.statuses);
@@ -107,10 +103,16 @@ export const discoverFn = createServerFn({ method: "POST" })
     q = q.order(data.sortBy, { ascending: data.sortDir === "asc" }).range(from, to);
     const { data: rows, count, error } = await q;
     if (error) throw new Error(error.message);
-    // optional client-side regex filter (postgres regex would need raw SQL)
-    let filtered = rows ?? [];
+    // Manual join: fetch metrics for the visible rows.
+    const ids = (rows ?? []).map((r: any) => r.id).filter(Boolean);
+    let metricsByDomain = new Map<string, any>();
+    if (ids.length) {
+      const { data: metrics } = await sb.from("domain_metrics").select("*").in("domain_id", ids);
+      for (const m of (metrics as any[]) ?? []) metricsByDomain.set(m.domain_id, m);
+    }
+    let filtered = (rows ?? []).map((r: any) => ({ ...r, metrics: metricsByDomain.get(r.id) ?? null }));
     if (data.regex) {
-      try { const re = new RegExp(data.regex, "i"); filtered = filtered.filter(r => re.test(r.name)); }
+      try { const re = new RegExp(data.regex, "i"); filtered = filtered.filter((r: any) => re.test(r.name)); }
       catch {}
     }
     if (data.archiveYearMin != null) filtered = filtered.filter((r: any) => (r.metrics?.archive_year ?? 0) >= data.archiveYearMin!);
@@ -151,9 +153,9 @@ export const importDomainsFn = createServerFn({ method: "POST" })
     let inserted = 0;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      const { error, count } = await sb.from("domains").upsert(slice, { onConflict: "domain", count: "exact", ignoreDuplicates: false });
+      const { error } = await sb.from("domains").upsert(slice, { onConflict: "domain" });
       if (error) throw new Error(error.message);
-      inserted += count ?? slice.length;
+      inserted += slice.length;
     }
     if (data.autoCheck) {
       // Fire-and-forget: queue background checks for new rows (capped)
@@ -263,9 +265,16 @@ export const checkRelatedTldsFn = createServerFn({ method: "POST" })
 export const listWatchlistFn = createServerFn({ method: "GET" }).handler(async () => {
   const sb = sbAdmin();
   const { data, error } = await sb.from("watchlist")
-    .select("*, domain:domains(*)").order("created_at", { ascending: false }).limit(500);
+    .select("*").order("created_at", { ascending: false }).limit(500);
   if (error) throw new Error(error.message);
-  return data ?? [];
+  const rows = (data as any[]) ?? [];
+  const ids = rows.map((r) => r.domain_id).filter(Boolean);
+  let byId = new Map<string, any>();
+  if (ids.length) {
+    const { data: doms } = await sb.from("domains").select("*").in("id", ids);
+    for (const d of (doms as any[]) ?? []) byId.set(d.id, d);
+  }
+  return rows.map((r) => ({ ...r, domain: byId.get(r.domain_id) ?? null }));
 });
 
 export const toggleWatchFn = createServerFn({ method: "POST" })

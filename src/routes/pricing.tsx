@@ -221,7 +221,7 @@ function PricingPage() {
           <p className="text-xs text-muted-foreground">暂无该 TLD 的可用优惠。</p>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
-            {coupons.map(c => (
+            {coupons.map((c: any) => (
               <li key={c.id} className="rounded-md border border-border bg-surface p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <code className="rounded bg-accent px-1.5 py-0.5 text-xs font-semibold">{c.code}</code>
