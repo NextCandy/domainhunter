@@ -153,9 +153,9 @@ export const importDomainsFn = createServerFn({ method: "POST" })
     let inserted = 0;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const slice = rows.slice(i, i + CHUNK);
-      const { error, count } = await sb.from("domains").upsert(slice, { onConflict: "domain", count: "exact", ignoreDuplicates: false });
+      const { error } = await sb.from("domains").upsert(slice, { onConflict: "domain" });
       if (error) throw new Error(error.message);
-      inserted += count ?? slice.length;
+      inserted += slice.length;
     }
     if (data.autoCheck) {
       // Fire-and-forget: queue background checks for new rows (capped)
