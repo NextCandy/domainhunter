@@ -1,78 +1,69 @@
-# Domain Hunter 功能融合升级计划
+## 目标
 
-将 mcpmarket domain-hunter 的产品逻辑融入现有项目，**不推倒重写**，在现有 `domains / jobs / enrich_jobs / watchlist / my_domains / registrars` 等表与页面基础上渐进扩展。
+将当前依赖 Lovable Cloud（Supabase 托管）的 DomainHunter 项目重构为可在群晖 DS923+（DSM 7，Container Manager）通过 `docker-compose up -d` 一键部署的自托管版本，数据库改为同一 compose 内的 PostgreSQL 16，并提交到已连接的 GitHub 仓库。
 
-## 现状评估（基于当前代码）
-- 已有：RDAP 批量发现、Enrich（DNS/Archive/SEO）、watchlist、my_domains、registrars、admin（设置/历史/TLD/用户）、auth。
-- 缺失：域名灵感生成、注册商价格对比页、优惠码管理、购买建议、注册商 API 密钥加密管理、Spaceship Provider。
+## 重要前置说明（请确认）
 
-## 分阶段交付（每阶段独立可运行）
+把整套 Supabase 替换为"裸 Postgres 直连"涉及代码面非常广，需要同时改写以下层（保留功能不变）：
 
-### 阶段 1 — 数据层（迁移）
-- 扩展 `registrars`：新增 `slug, website, api_enabled, api_base_url, api_key_encrypted, api_secret_encrypted, status, notes`（兼容旧字段）。
-- 新增 `registrar_prices`：tld、首年/续费/转入、币种、隐私免费、API 支持、更新时间。
-- 新增 `coupons`：注册商、码、标题、TLD 范围、折扣类型、有效期、来源、verified、status。
-- 新增 `domain_ideas`：用户生成的灵感记录（关键词、参数、结果 JSON）。
-- 复用现有 `domains` 表作为 `domain_checks` 视角，状态字段扩展枚举：`available/taken/premium/reserved/invalid/unknown`。
-- 所有新表加 GRANT + RLS（admin 写、authenticated 读）。
+1. **认证**：当前 Google OAuth + Supabase Auth + `auth.users` + `requireSupabaseAuth` 中间件 → 改为本地 email/password + JWT（cookie httpOnly），管理员首注册即 admin（保留现有逻辑）。Google OAuth 在自托管下需要用户自己申请 Google Client，默认先关闭，留接入位。
+2. **数据访问**：所有 `supabase.from(...)`、RLS 策略、`has_role`、`user_roles` → 改为 `pg`（node-postgres）+ 服务端 `createServerFn` 内手动鉴权 + 业务层权限判断。RLS 仍保留在 DB 里作为兜底，但运行时统一用单一应用角色连接。
+3. **类型**：移除 `src/integrations/supabase/*` 自动生成依赖，改为手写或用 `kysely-codegen` 生成的类型（计划用轻量手写 + zod 校验）。
+4. **存储**：当前未使用 Supabase Storage，无需处理。
+5. **AI Gateway**：Lovable AI（`LOVABLE_API_KEY`）在自托管下不可用 → 抽象成 `AI_PROVIDER` 环境变量，默认 `openai-compatible`（兼容 OpenAI / Ollama / DeepSeek），用户填 `AI_BASE_URL` + `AI_API_KEY` + `AI_MODEL` 即可。
+6. **Semrush 连接器**：同样抽象为可选 env `SEMRUSH_API_KEY`，未配置则该面板降级。
 
-### 阶段 2 — 服务层抽象（不改 UI）
-在 `src/lib/services/` 下建立可替换服务接口：
-- `domain-generator.service.ts`（基于规则 + 可选 Lovable AI）
-- `domain-availability.service.ts`（封装现有 RDAP，统一返回结构）
-- `registrar-price.service.ts`
-- `coupon.service.ts`
-- `registrar-provider.service.ts`（Provider 接口 + Spaceship 实现 + Mock 默认）
-- 统一 `DomainCheckResult` 类型。
-- 密钥使用 `SECRET_ENCRYPTION_KEY`（generate_secret）+ AES-GCM 加密；前端只回显 `sk_****abcd`。
+## 交付物
 
-### 阶段 3 — 域名灵感页 `/ideas`
-- 表单：关键词、行业、用途、语言、长度、后缀偏好。
-- 调用 Lovable AI（gemini-3-flash）+ 规则混合生成 5–30 个候选。
-- 卡片展示：理由 / 用途 / 记忆度 / 品牌感 / 长度 / 后缀 / 是否建议购买。
-- 操作：复制、加入检测队列（跳 /discover 预填）、加入 watchlist。
+### 部署文件（新增）
 
-### 阶段 4 — 检测流增强
-- `/check` 新增轻量批量检测页（文本框 + 多后缀 fan-out + 进度 + 导出），复用现有 RDAP/jobs。
-- 状态枚举对齐 available/taken/premium/reserved/invalid/unknown。
-- 单域名检测后弹出"购买建议"组件：推荐注册商、价格、优惠码、风险提示、跳转购买链接（不自动购买）。
+- `Dockerfile` — 多阶段，Node 20-alpine，`bun install && bun run build`，运行时 `node .output/server/index.mjs`（TanStack Start Nitro 产物）。
+- `docker-compose.yml` — 三服务：
+  - `postgres`（pg16-alpine，持久卷 `./data/pg`，仅内网暴露）
+  - `app`（构建本仓库，端口 `3000`，依赖 postgres healthcheck）
+  - `migrate`（一次性运行 SQL 迁移，退出即可）
+- `db/init/*.sql` — 从现有 `supabase/migrations/` 合并而来的纯 Postgres 初始化脚本（去掉 `auth.users` FK，新增 `app_users` 表；保留 `user_roles`、`app_role` 枚举、所有业务表、`pg_trgm` 扩展、触发器、`has_role` 函数）。
+- `.env.example` — `DATABASE_URL`、`JWT_SECRET`、`SESSION_SECRET`、`AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL`、`SEMRUSH_API_KEY`、`GOOGLE_CLIENT_ID/SECRET`(可选)、`APP_ORIGIN`、`PORT`。
+- `README.deploy.md` — 群晖 DS923 部署步骤（SSH 启用 → Container Manager → 上传 compose → 初始化管理员账号 → 反代 + HTTPS）。
+- `.dockerignore`、`.gitignore` 补齐。
 
-### 阶段 5 — 价格对比 `/prices`
-- 表格 + 卡片，支持按 TLD 筛选与多维排序。
-- 显示价格更新时间，明确标"非实时"。
-- 后台 `/admin/prices` 增删改 `registrar_prices`。
+### 代码重构（替换）
 
-### 阶段 6 — 优惠码 `/coupons` + `/admin/coupons`
-- 前台：按注册商/TLD 筛选有效优惠码；过期自动灰显。
-- 后台：CRUD + verified 标记。
+- `src/server/db.ts` — `pg` Pool 单例，从 `DATABASE_URL` 读取。
+- `src/server/auth.ts` — JWT 签发/校验、bcrypt 密码、`requireAuth` / `requireAdmin` 中间件（替代 `requireSupabaseAuth` + `assertAdmin`）。
+- `src/server/ai.ts` — `chatCompletion()`，OpenAI 兼容 fetch 封装，替代 Lovable AI Gateway 调用。
+- `src/integrations/supabase/*` — **删除**。所有引用改为 `@/server/db` + `@/server/auth`。
+- `src/routes/_authenticated/route.tsx` — 改为读取本地 `/api/auth/me` 而不是 `supabase.auth.getUser()`。
+- `src/routes/auth.tsx` — email/password 表单 + 可选 Google 按钮。
+- `src/start.ts` — 移除 Supabase bearer attacher，改为本地 cookie 自动随同 `fetch`（serverFn 默认 `credentials: 'include'`）。
+- `src/lib/*.functions.ts`（约 12 个）— 把每个 `.from('table').select()` 替换为 `db.query('select ... from table where ...', [params])`，并在 handler 内手动做权限判断。
 
-### 阶段 7 — 注册商 API 管理 `/admin/registrars`
-- 扩展现有 admin 页：API Key/Secret 加密保存、脱敏显示、测试连接按钮、启用/禁用。
-- Spaceship Provider：availability / list / DNS / nameserver / autorenew（注册与修改 DNS 预留 + 二次确认）。
-- 其他注册商（Namecheap/Porkbun/Dynadot/Cloudflare/NameSilo/GoDaddy）通过同一 Provider 接口扩展，初期为 stub。
+### GitHub 推送
 
-### 阶段 8 — Dashboard 升级
-- 在现有首页加：我的域名数、关注数、即将到期、最近检测、推荐关注、API 状态、今日检测次数 8 个卡片。
+项目已通过 Lovable 的 GitHub 集成连接，所有上述改动会在批准后**自动同步到仓库的 default 分支**，无需我执行 git 命令。完成后会给出仓库链接确认。
 
-### 阶段 9 — 验证
-- typecheck / build / 关键路由 smoke（/, /ideas, /check, /prices, /coupons, /watchlist, /my-domains, /admin/*）。
-- 移动端断点 review。
+## 工作量与节奏
 
-## 安全
-- 密钥 AES-GCM 加密入库；前端永不回显完整密钥。
-- 所有写操作走 `requireSupabaseAuth` + `has_role('admin')`。
-- 危险操作（注册/改 DNS/删配置）二次确认弹窗。
-- 不实现自动购买；购买按钮仅 deep-link 到注册商。
+代码重构面非常大（约 30~40 个文件改动 + 4 个新文件 + 删除 Supabase 集成），将分 **3 个连续阶段** 推进，每阶段结束都能 `bun run build` 通过：
 
-## 兼容性承诺
-- 不删除现有路由 / 表 / 列；只做加列与新表。
-- 不修改 auto-gen 文件。
-- 现有 RDAP/Enrich/Watchlist/Admin 流程保持可用。
+1. **阶段 A**：Docker 部署骨架 + Postgres 初始化 SQL + DB/Auth/AI 抽象层 + README（不删 Supabase，先双轨编译通过）。
+2. **阶段 B**：迁移核心 serverFn（`pricing` / `ideas` / `discover` / `enrich` / `jobs` / `admin`）到 `pg` 直连，删除 `supabase/client.server`、`auth-middleware`、`auth-attacher`、所有 `supabase.from(...)`。
+3. **阶段 C**：重写 `/auth` 与 `_authenticated` 守卫，删除 `src/integrations/supabase/*` 与 `supabase/` 目录，最终验证 `bun run build` + 本地 `docker compose up` 烟测说明。
 
-## 交付节奏建议
-单回合做不完全部 9 个阶段。建议本回合先完成 **阶段 1–3（数据层 + 服务抽象 + 域名灵感页）**，作为最小可见增量，下一回合继续阶段 4 起。
+## 用户需自行准备的事项
 
-请确认：
-1. 是否同意按此阶段顺序推进、本回合先做阶段 1–3？
-2. 域名灵感生成是否同意默认使用 Lovable AI（gemini-3-flash，已有 LOVABLE_API_KEY）？
-3. 优惠码后台 CRUD 是否只限管理员？（默认是）
+- 群晖：DSM 7.2+，安装 **Container Manager**，开启 SSH（首次部署用）。
+- 把 `.env.example` 复制为 `.env` 并填写至少 `JWT_SECRET`（32+ 随机串）和 `AI_*`（如需 AI 灵感生成）。
+- 反代：DSM "控制面板 → 登录入口 → 反向代理"，把自有域名指向 `localhost:3000` 并申请 Let's Encrypt 证书。
+- 首次访问 `/auth` 注册的账号将自动成为管理员（沿用现有 `handle_new_user_admin` 触发器逻辑，改写到 `app_users` 触发器）。
+
+## 风险与取舍
+
+- Lovable 的预览环境**仍依赖 Lovable Cloud**；本次重构后预览页会要求本地 Postgres，无法在 Lovable 在线预览继续 demo。如果你希望"预览继续用 Lovable Cloud + 部署用自托管"，请告诉我，我会改为**双模式**：通过 `BACKEND=supabase|selfhost` 环境变量切换。
+- Google OAuth 在自托管下默认禁用，待用户配置 Client 后启用。
+
+---
+
+请确认是否：
+A) 按上述全量重构推进（预览将不可用，只能 docker 跑）；或
+B) 改为**双模式**保留 Lovable 预览同时支持 docker 部署（工作量再增约 30%）。
