@@ -54,7 +54,7 @@ export const compareTldFn = createServerFn({ method: "GET" })
     ]);
     if (pricesRes.error) throw pricesRes.error;
     const now = Date.now();
-    const coupons = (couponsRes.data ?? []).filter(c => {
+    const coupons = ((couponsRes.data ?? []) as any[]).filter((c: any) => {
       if (c.valid_from && new Date(c.valid_from).getTime() > now) return false;
       if (c.valid_until && new Date(c.valid_until).getTime() < now) return false;
       if (c.tlds && Array.isArray(c.tlds) && c.tlds.length > 0 && !c.tlds.includes(tld)) return false;
@@ -64,7 +64,7 @@ export const compareTldFn = createServerFn({ method: "GET" })
     const rows: PricingRow[] = (pricesRes.data ?? []).map((row: any) => {
       const r = row.registrars ?? {};
       // Match best coupon by registrar
-      const cands = coupons.filter(c => c.registrar_id === row.registrar_id);
+      const cands = coupons.filter((c: any) => c.registrar_id === row.registrar_id);
       let best: typeof cands[number] | null = null;
       let bestPrice = row.register_price ?? null;
       for (const c of cands) {
