@@ -91,7 +91,7 @@ export const discoverFn = createServerFn({ method: "POST" })
     const sb = sbAdmin();
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
-    let q = sb.from("domains").select("*, metrics:domain_metrics(*)", { count: "exact" });
+    let q = sb.from("domains").select("*", { count: "exact" });
     if (data.q) q = q.ilike("domain", `%${data.q}%`);
     if (data.tlds?.length) q = q.in("tld", data.tlds);
     if (data.statuses?.length) q = q.in("status", data.statuses);
@@ -107,10 +107,16 @@ export const discoverFn = createServerFn({ method: "POST" })
     q = q.order(data.sortBy, { ascending: data.sortDir === "asc" }).range(from, to);
     const { data: rows, count, error } = await q;
     if (error) throw new Error(error.message);
-    // optional client-side regex filter (postgres regex would need raw SQL)
-    let filtered = rows ?? [];
+    // Manual join: fetch metrics for the visible rows.
+    const ids = (rows ?? []).map((r: any) => r.id).filter(Boolean);
+    let metricsByDomain = new Map<string, any>();
+    if (ids.length) {
+      const { data: metrics } = await sb.from("domain_metrics").select("*").in("domain_id", ids);
+      for (const m of (metrics as any[]) ?? []) metricsByDomain.set(m.domain_id, m);
+    }
+    let filtered = (rows ?? []).map((r: any) => ({ ...r, metrics: metricsByDomain.get(r.id) ?? null }));
     if (data.regex) {
-      try { const re = new RegExp(data.regex, "i"); filtered = filtered.filter(r => re.test(r.name)); }
+      try { const re = new RegExp(data.regex, "i"); filtered = filtered.filter((r: any) => re.test(r.name)); }
       catch {}
     }
     if (data.archiveYearMin != null) filtered = filtered.filter((r: any) => (r.metrics?.archive_year ?? 0) >= data.archiveYearMin!);
