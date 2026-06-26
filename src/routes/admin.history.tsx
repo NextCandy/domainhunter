@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { listAdminHistoryFn } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/history")({ component: AdminHistory });
 
@@ -29,13 +29,8 @@ function AdminHistory() {
   const rdapQ = useQuery({
     queryKey: ["admin-history-rdap", status, range.fromIso, range.toIso],
     queryFn: async () => {
-      let q = supabase.from("jobs").select("*").order("created_at", { ascending: false }).limit(200);
-      if (status !== "all") q = q.eq("status", status);
-      if (range.fromIso) q = q.gte("created_at", range.fromIso);
-      if (range.toIso) q = q.lte("created_at", range.toIso);
-      const { data, error } = await q;
-      if (error) throw new Error(error.message);
-      return (data ?? []).map(j => ({ ...j, _kind: "rdap" as const }));
+      const rows = await listAdminHistoryFn({ data: { kind: "jobs", status, fromIso: range.fromIso, toIso: range.toIso } });
+      return (rows ?? []).map((j: any) => ({ ...j, _kind: "rdap" as const }));
     },
     refetchInterval: 8000,
   });
@@ -43,13 +38,8 @@ function AdminHistory() {
   const enrichQ = useQuery({
     queryKey: ["admin-history-enrich", status, range.fromIso, range.toIso],
     queryFn: async () => {
-      let q = supabase.from("enrich_jobs").select("*").order("created_at", { ascending: false }).limit(200);
-      if (status !== "all") q = q.eq("status", status);
-      if (range.fromIso) q = q.gte("created_at", range.fromIso);
-      if (range.toIso) q = q.lte("created_at", range.toIso);
-      const { data, error } = await q;
-      if (error) throw new Error(error.message);
-      return (data ?? []).map(j => ({ ...j, _kind: "enrich" as const }));
+      const rows = await listAdminHistoryFn({ data: { kind: "enrich_jobs", status, fromIso: range.fromIso, toIso: range.toIso } });
+      return (rows ?? []).map((j: any) => ({ ...j, _kind: "enrich" as const }));
     },
     refetchInterval: 8000,
   });

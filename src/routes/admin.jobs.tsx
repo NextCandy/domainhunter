@@ -1,20 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/app-shell";
+import { listAdminHistoryFn } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/jobs")({
   component: AdminJobs,
 });
 
-const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY);
-
 function AdminJobs() {
   const { data, isLoading } = useQuery({
     queryKey: ["admin-jobs"],
     queryFn: async () => {
-      const { data } = await sb.from("jobs").select("*").order("created_at", { ascending: false }).limit(50);
-      return data ?? [];
+      const rows = await listAdminHistoryFn({ data: { kind: "jobs" } });
+      return (rows ?? []).slice(0, 50);
     },
     refetchInterval: 5000,
   });

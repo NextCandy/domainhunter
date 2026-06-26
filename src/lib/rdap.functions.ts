@@ -267,7 +267,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
           checked_at: new Date().toISOString(),
         })
         .eq("id", it.id)
-        .then((x) => x);
+        .then((x: any) => x);
       updatesArr.push(p);
     }
     await Promise.allSettled(updatesArr);

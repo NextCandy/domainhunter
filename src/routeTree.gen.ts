@@ -34,7 +34,11 @@ import { Route as AdminRegistrarsRouteImport } from './routes/admin.registrars'
 import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
 import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as AdminHistoryRouteImport } from './routes/admin.history'
+import { Route as ApiPublicRpcNameRouteImport } from './routes/api/public/rpc/$name'
 import { Route as ApiPublicHooksSyncPricesRouteImport } from './routes/api/public/hooks/sync-prices'
+import { Route as ApiPublicAuthSignupRouteImport } from './routes/api/public/auth/signup'
+import { Route as ApiPublicAuthMeRouteImport } from './routes/api/public/auth/me'
+import { Route as ApiPublicAuthLoginRouteImport } from './routes/api/public/auth/login'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
 import { Route as ApiPublicEnrichIdDownloadRouteImport } from './routes/api/public/enrich.$id.download'
 
@@ -163,12 +167,32 @@ const AdminHistoryRoute = AdminHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiPublicRpcNameRoute = ApiPublicRpcNameRouteImport.update({
+  id: '/api/public/rpc/$name',
+  path: '/api/public/rpc/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksSyncPricesRoute =
   ApiPublicHooksSyncPricesRouteImport.update({
     id: '/api/public/hooks/sync-prices',
     path: '/api/public/hooks/sync-prices',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAuthSignupRoute = ApiPublicAuthSignupRouteImport.update({
+  id: '/api/public/auth/signup',
+  path: '/api/public/auth/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAuthMeRoute = ApiPublicAuthMeRouteImport.update({
+  id: '/api/public/auth/me',
+  path: '/api/public/auth/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAuthLoginRoute = ApiPublicAuthLoginRouteImport.update({
+  id: '/api/public/auth/login',
+  path: '/api/public/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicJobsJobIdDownloadRoute =
   ApiPublicJobsJobIdDownloadRouteImport.update({
     id: '/api/public/jobs/$jobId/download',
@@ -208,7 +232,11 @@ export interface FileRoutesByFullPath {
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/auth/login': typeof ApiPublicAuthLoginRoute
+  '/api/public/auth/me': typeof ApiPublicAuthMeRoute
+  '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
   '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
+  '/api/public/rpc/$name': typeof ApiPublicRpcNameRoute
   '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -237,7 +265,11 @@ export interface FileRoutesByTo {
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin': typeof AdminIndexRoute
+  '/api/public/auth/login': typeof ApiPublicAuthLoginRoute
+  '/api/public/auth/me': typeof ApiPublicAuthMeRoute
+  '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
   '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
+  '/api/public/rpc/$name': typeof ApiPublicRpcNameRoute
   '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -268,7 +300,11 @@ export interface FileRoutesById {
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/public/auth/login': typeof ApiPublicAuthLoginRoute
+  '/api/public/auth/me': typeof ApiPublicAuthMeRoute
+  '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
   '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
+  '/api/public/rpc/$name': typeof ApiPublicRpcNameRoute
   '/api/public/enrich/$id/download': typeof ApiPublicEnrichIdDownloadRoute
   '/api/public/jobs/$jobId/download': typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -300,7 +336,11 @@ export interface FileRouteTypes {
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin/'
+    | '/api/public/auth/login'
+    | '/api/public/auth/me'
+    | '/api/public/auth/signup'
     | '/api/public/hooks/sync-prices'
+    | '/api/public/rpc/$name'
     | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   fileRoutesByTo: FileRoutesByTo
@@ -329,7 +369,11 @@ export interface FileRouteTypes {
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin'
+    | '/api/public/auth/login'
+    | '/api/public/auth/me'
+    | '/api/public/auth/signup'
     | '/api/public/hooks/sync-prices'
+    | '/api/public/rpc/$name'
     | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   id:
@@ -359,7 +403,11 @@ export interface FileRouteTypes {
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin/'
+    | '/api/public/auth/login'
+    | '/api/public/auth/me'
+    | '/api/public/auth/signup'
     | '/api/public/hooks/sync-prices'
+    | '/api/public/rpc/$name'
     | '/api/public/enrich/$id/download'
     | '/api/public/jobs/$jobId/download'
   fileRoutesById: FileRoutesById
@@ -379,7 +427,11 @@ export interface RootRouteChildren {
   WatchlistRoute: typeof WatchlistRoute
   DomainsDomainRoute: typeof DomainsDomainRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
+  ApiPublicAuthLoginRoute: typeof ApiPublicAuthLoginRoute
+  ApiPublicAuthMeRoute: typeof ApiPublicAuthMeRoute
+  ApiPublicAuthSignupRoute: typeof ApiPublicAuthSignupRoute
   ApiPublicHooksSyncPricesRoute: typeof ApiPublicHooksSyncPricesRoute
+  ApiPublicRpcNameRoute: typeof ApiPublicRpcNameRoute
   ApiPublicEnrichIdDownloadRoute: typeof ApiPublicEnrichIdDownloadRoute
   ApiPublicJobsJobIdDownloadRoute: typeof ApiPublicJobsJobIdDownloadRoute
 }
@@ -561,11 +613,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHistoryRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/public/rpc/$name': {
+      id: '/api/public/rpc/$name'
+      path: '/api/public/rpc/$name'
+      fullPath: '/api/public/rpc/$name'
+      preLoaderRoute: typeof ApiPublicRpcNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/sync-prices': {
       id: '/api/public/hooks/sync-prices'
       path: '/api/public/hooks/sync-prices'
       fullPath: '/api/public/hooks/sync-prices'
       preLoaderRoute: typeof ApiPublicHooksSyncPricesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/auth/signup': {
+      id: '/api/public/auth/signup'
+      path: '/api/public/auth/signup'
+      fullPath: '/api/public/auth/signup'
+      preLoaderRoute: typeof ApiPublicAuthSignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/auth/me': {
+      id: '/api/public/auth/me'
+      path: '/api/public/auth/me'
+      fullPath: '/api/public/auth/me'
+      preLoaderRoute: typeof ApiPublicAuthMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/auth/login': {
+      id: '/api/public/auth/login'
+      path: '/api/public/auth/login'
+      fullPath: '/api/public/auth/login'
+      preLoaderRoute: typeof ApiPublicAuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/jobs/$jobId/download': {
@@ -639,7 +719,11 @@ const rootRouteChildren: RootRouteChildren = {
   WatchlistRoute: WatchlistRoute,
   DomainsDomainRoute: DomainsDomainRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
+  ApiPublicAuthLoginRoute: ApiPublicAuthLoginRoute,
+  ApiPublicAuthMeRoute: ApiPublicAuthMeRoute,
+  ApiPublicAuthSignupRoute: ApiPublicAuthSignupRoute,
   ApiPublicHooksSyncPricesRoute: ApiPublicHooksSyncPricesRoute,
+  ApiPublicRpcNameRoute: ApiPublicRpcNameRoute,
   ApiPublicEnrichIdDownloadRoute: ApiPublicEnrichIdDownloadRoute,
   ApiPublicJobsJobIdDownloadRoute: ApiPublicJobsJobIdDownloadRoute,
 }
