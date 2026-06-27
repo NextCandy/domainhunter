@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { listAdminHistoryFn } from "@/lib/admin.functions";
+import { TableSkeleton } from "@/components/skeleton";
 
 export const Route = createFileRoute("/admin/history")({ component: AdminHistory });
 
@@ -102,7 +103,7 @@ function AdminHistory() {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">加载中…</td></tr>}
+              {loading && <TableSkeleton rows={6} cols={8} />}
               {!loading && !rows.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">无匹配记录</td></tr>}
               {rows.map((j: any) => {
                 const total = j.total ?? 0;

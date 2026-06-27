@@ -10,12 +10,13 @@ export const Route = createFileRoute("/api/public/enrich/$id/download")({
         const url = new URL(request.url);
         const kind = url.searchParams.get("kind") ?? "enriched_csv";
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { data: job } = await supabaseAdmin.from("enrich_jobs").select("id, name, kinds").eq("id", id).maybeSingle();
+        const { pgShim } = await import("@/lib/pg-shim.server");
+        const db = pgShim;
+        const { data: job } = await db.from("enrich_jobs").select("id, name, kinds").eq("id", id).maybeSingle();
         if (!job) return new Response("Not found", { status: 404 });
 
         // Pull all items (capped)
-        const { data: items } = await supabaseAdmin
+        const { data: items } = await db
           .from("enrich_items")
           .select("domain, kind, status, result")
           .eq("enrich_job_id", id)
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/api/public/enrich/$id/download")({
         let rows = Array.from(map.values());
 
         // Joined with job_items registration data when available
-        const { data: srcItems } = await supabaseAdmin
+        const { data: srcItems } = await db
           .from("job_items")
           .select("domain, status, info")
           .eq("job_id", (job as any).source_job_id ?? "00000000-0000-0000-0000-000000000000")

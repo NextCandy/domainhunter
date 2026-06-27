@@ -5,7 +5,7 @@ import { Filter, RefreshCw, Search, Sparkles, X, Download, RotateCw, SkipForward
 import { useNavigate } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
-import { discoverFn, toggleWatchFn, refreshDomainFn, liveScanFn, getTldListFn, type DiscoverFilters } from "@/lib/discover.functions";
+import { discoverFn, toggleWatchFn, refreshDomainFn, liveScanFn, getTldListFn, deleteDomainsFn, type DiscoverFilters } from "@/lib/discover.functions";
 import { createEnrichJobFn } from "@/lib/enrich-jobs.functions";
 import { lookupDomainFn, runJobBatchFn, requeueErrorsFn, jobProgressFn, recentItemsFn } from "@/lib/rdap.functions";
 import { toast } from "sonner";
@@ -52,12 +52,12 @@ export function DiscoverView({
   const [quickResult, setQuickResult] = useState<any | null>(null);
   const quickLookup = useMutation({
     mutationFn: (d: string) => lookupDomainFn({ data: { domain: d } }),
-    onSuccess: (r) => {
+    onSuccess: (r, d) => {
       setQuickResult(r);
       const tag = (r as any).status === "available" ? "可注册" :
                   (r as any).status === "registered" ? "已注册" :
                   (r as any).status === "error" ? "查询失败" : (r as any).status;
-      toast.success(`${(r as any).domain} · ${tag}`);
+      toast.success(`${d} · ${tag}`);
     },
     onError: (e: any) => { setQuickResult({ status: "error", error: e?.message }); toast.error(e?.message ?? "查询失败"); },
   });
@@ -120,6 +120,12 @@ export function DiscoverView({
     mutationFn: (d: DomainRow) => refreshDomainFn({ data: { domain: d.domain } }),
     onSuccess: (r) => { toast.success(`${r.domain} · ${r.status} · 评分 ${r.score}`); refetch(); },
     onError: (e: any) => toast.error(e?.message ?? "刷新失败"),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (domains: string[]) => deleteDomainsFn({ data: { domains } }),
+    onSuccess: (r) => { toast.success(`已删除 ${r.deleted} 个域名`); refetch(); },
+    onError: (e: any) => toast.error(e?.message ?? "删除失败"),
   });
 
   const nav = useNavigate();
@@ -362,6 +368,7 @@ export function DiscoverView({
             onWatch={(d) => watchMut.mutate(d)}
             onRefresh={(d) => refreshMut.mutate(d)}
             onEnrich={(d) => enrichOne.mutate(d)}
+            onDelete={(domains) => deleteMut.mutate(domains)}
           />
         </div>
       </div>

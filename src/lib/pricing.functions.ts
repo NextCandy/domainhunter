@@ -2,9 +2,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { pgShim } from "./pg-shim.server";
-import type { Database } from "@/integrations/supabase/types";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertAdmin } from "./admin-guard.server";
+import { requireAuth, requireAdmin } from "@/lib/auth-guards";
+import { query } from "@/lib/db.server";
 
 function sb() {
   return pgShim;
@@ -37,32 +36,49 @@ function normTld(t: string) {
 
 // ───────── Public-ish listing for the comparison page ─────────
 export const compareTldFn = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d: { tld: string; domain?: string }) =>
     z.object({ tld: z.string().min(1).max(40), domain: z.string().max(253).optional() }).parse(d),
   )
   .handler(async ({ data }) => {
     const tld = normTld(data.tld);
-    const s = sb();
     const [pricesRes, couponsRes] = await Promise.all([
-      s.from("registrar_prices")
-        .select("id,registrar_id,tld,register_price,renew_price,transfer_price,currency,privacy_free,api_supported,notes, registrars!inner(id,name,slug,enabled,buy_url_template,status)")
-        .eq("tld", tld),
-      s.from("coupons")
-        .select("id,registrar_id,code,title,description,tlds,discount_type,discount_value,valid_from,valid_until,source_url,verified,status")
-        .eq("status", "active"),
+      query(`
+        SELECT
+          p.id,
+          p.registrar_id,
+          p.tld,
+          p.register_price,
+          p.renew_price,
+          p.transfer_price,
+          p.currency,
+          p.privacy_free,
+          p.api_supported,
+          p.notes,
+          r.name AS registrar_name,
+          r.slug AS registrar_slug,
+          r.buy_url_template
+        FROM public.registrar_prices p
+        JOIN public.registrars r ON r.id = p.registrar_id
+        WHERE p.tld = $1 AND r.enabled = true AND r.status = 'active'
+        ORDER BY p.register_price NULLS LAST, r.name
+      `, [tld]),
+      query(`
+        SELECT id, registrar_id, code, title, description, tlds, discount_type,
+               discount_value, valid_from, valid_until, source_url, verified, status
+        FROM public.coupons
+        WHERE status = 'active'
+      `),
     ]);
-    if (pricesRes.error) throw pricesRes.error;
     const now = Date.now();
-    const coupons = ((couponsRes.data ?? []) as any[]).filter((c: any) => {
+    const coupons = ((couponsRes.rows ?? []) as any[]).filter((c: any) => {
       if (c.valid_from && new Date(c.valid_from).getTime() > now) return false;
       if (c.valid_until && new Date(c.valid_until).getTime() < now) return false;
       if (c.tlds && Array.isArray(c.tlds) && c.tlds.length > 0 && !c.tlds.includes(tld)) return false;
       return true;
     });
 
-    const rows: PricingRow[] = (pricesRes.data ?? []).map((row: any) => {
-      const r = row.registrars ?? {};
+    const rows: PricingRow[] = (pricesRes.rows ?? []).map((row: any) => {
       // Match best coupon by registrar
       const cands = coupons.filter((c: any) => c.registrar_id === row.registrar_id);
       let best: typeof cands[number] | null = null;
@@ -75,12 +91,12 @@ export const compareTldFn = createServerFn({ method: "GET" })
         else if (c.discount_type === "price" && c.discount_value) p = Number(c.discount_value);
         if (bestPrice == null || p < bestPrice) { bestPrice = p; best = c; }
       }
-      const buy_url = (r.buy_url_template as string | null)?.replace("{domain}", data.domain ?? `example.${tld}`) ?? null;
+      const buy_url = (row.buy_url_template as string | null)?.replace("{domain}", data.domain ?? `example.${tld}`) ?? null;
       return {
         id: row.id,
         registrar_id: row.registrar_id,
-        registrar_name: r.name ?? `#${row.registrar_id}`,
-        registrar_slug: r.slug ?? null,
+        registrar_name: row.registrar_name ?? `#${row.registrar_id}`,
+        registrar_slug: row.registrar_slug ?? null,
         buy_url_template: buy_url,
         tld: row.tld,
         register_price: row.register_price,
@@ -115,7 +131,7 @@ export const compareTldFn = createServerFn({ method: "GET" })
 
 // ───────── Admin: bulk upsert prices ─────────
 export const upsertPriceFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: any) => z.object({
     id: z.number().optional(),
     registrar_id: z.number(),
@@ -128,8 +144,7 @@ export const upsertPriceFn = createServerFn({ method: "POST" })
     api_supported: z.boolean().optional(),
     notes: z.string().max(500).optional(),
   }).parse(d))
-  .handler(async ({ context, data }) => {
-    await assertAdmin(context.supabase, context.userId);
+  .handler(async ({ data }) => {
     const s = sb();
     const payload = { ...data, tld: normTld(data.tld) };
     const { error } = data.id
@@ -140,41 +155,52 @@ export const upsertPriceFn = createServerFn({ method: "POST" })
   });
 
 export const deletePriceFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: { id: number }) => z.object({ id: z.number() }).parse(d))
-  .handler(async ({ context, data }) => {
-    await assertAdmin(context.supabase, context.userId);
+  .handler(async ({ data }) => {
     const { error } = await sb().from("registrar_prices").delete().eq("id", data.id);
     if (error) throw error;
     return { ok: true };
   });
 
 export const listPricesFn = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d: { tld?: string } = {}) => z.object({ tld: z.string().optional() }).parse(d))
   .handler(async ({ data }) => {
-    let q = sb().from("registrar_prices")
-      .select("id,registrar_id,tld,register_price,renew_price,transfer_price,currency,privacy_free,api_supported,notes,registrars(name)")
-      .order("tld").order("register_price", { ascending: true, nullsFirst: false });
-    if (data.tld) q = q.eq("tld", normTld(data.tld));
-    const { data: rows, error } = await q.limit(500);
-    if (error) throw error;
-    return rows ?? [];
+    const params: unknown[] = [];
+    const where = data.tld ? "WHERE p.tld = $1" : "";
+    if (data.tld) params.push(normTld(data.tld));
+    const { rows } = await query(`
+      SELECT p.id, p.registrar_id, p.tld, p.register_price, p.renew_price,
+             p.transfer_price, p.currency, p.privacy_free, p.api_supported,
+             p.notes, r.name AS registrar_name
+      FROM public.registrar_prices p
+      LEFT JOIN public.registrars r ON r.id = p.registrar_id
+      ${where}
+      ORDER BY p.tld, p.register_price NULLS LAST
+      LIMIT 500
+    `, params);
+    return rows;
   });
 
 // ───────── Coupons CRUD ─────────
 export const listCouponsFn = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .handler(async () => {
-    const { data, error } = await sb().from("coupons")
-      .select("id,registrar_id,code,title,description,tlds,discount_type,discount_value,valid_from,valid_until,source_url,verified,status,registrars(name)")
-      .order("status").order("valid_until", { ascending: true, nullsFirst: false }).limit(500);
-    if (error) throw error;
-    return data ?? [];
+    const { rows } = await query(`
+      SELECT c.id, c.registrar_id, c.code, c.title, c.description, c.tlds,
+             c.discount_type, c.discount_value, c.valid_from, c.valid_until,
+             c.source_url, c.verified, c.status, r.name AS registrar_name
+      FROM public.coupons c
+      LEFT JOIN public.registrars r ON r.id = c.registrar_id
+      ORDER BY c.status, c.valid_until NULLS LAST
+      LIMIT 500
+    `);
+    return rows;
   });
 
 export const upsertCouponFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: any) => z.object({
     id: z.number().optional(),
     registrar_id: z.number(),
@@ -190,8 +216,7 @@ export const upsertCouponFn = createServerFn({ method: "POST" })
     verified: z.boolean().optional(),
     status: z.enum(["active", "expired", "disabled"]).default("active"),
   }).parse(d))
-  .handler(async ({ context, data }) => {
-    await assertAdmin(context.supabase, context.userId);
+  .handler(async ({ data }) => {
     const payload = { ...data, tlds: data.tlds?.map(normTld) };
     const { error } = data.id
       ? await sb().from("coupons").update(payload).eq("id", data.id)
@@ -201,10 +226,9 @@ export const upsertCouponFn = createServerFn({ method: "POST" })
   });
 
 export const deleteCouponFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: { id: number }) => z.object({ id: z.number() }).parse(d))
-  .handler(async ({ context, data }) => {
-    await assertAdmin(context.supabase, context.userId);
+  .handler(async ({ data }) => {
     const { error } = await sb().from("coupons").delete().eq("id", data.id);
     if (error) throw error;
     return { ok: true };
@@ -258,10 +282,9 @@ async function syncOne(registrar: any): Promise<SyncResult> {
 }
 
 export const syncRegistrarPricesFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: { registrarId?: number } = {}) => z.object({ registrarId: z.number().optional() }).parse(d))
-  .handler(async ({ context, data }) => {
-    await assertAdmin(context.supabase, context.userId);
+  .handler(async ({ data }) => {
     const s = sb();
     let q = s.from("registrars").select("id,name,enabled,config_json,api_enabled").eq("enabled", true);
     if (data.registrarId) q = q.eq("id", data.registrarId);
@@ -283,7 +306,7 @@ export async function syncAllRegistrarPricesInternal() {
 
 // ───────── Purchase writeback → my_domains ─────────
 export const recordPurchaseFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((d: any) => z.object({
     domain: z.string().min(3).max(253),
     registrar: z.string().max(80).optional(),
@@ -323,4 +346,3 @@ export const recordPurchaseFn = createServerFn({ method: "POST" })
     } catch { /* non-fatal */ }
     return { ok: true, domain };
   });
-

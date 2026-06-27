@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/app-shell";
+import { TableSkeleton } from "@/components/skeleton";
 import { listAdminHistoryFn } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin/jobs")({
@@ -21,7 +22,9 @@ function AdminJobs() {
     <div>
       <p className="mb-3 text-sm text-muted-foreground">查询任务来自批量 RDAP 工具。可以在<Link to="/tools/batch-rdap" className="text-primary hover:underline">/tools/batch-rdap</Link> 创建任务。</p>
       {isLoading ? (
-        <div className="card-elev p-8 text-center text-sm text-muted-foreground">加载中…</div>
+        <div className="card-elev overflow-hidden">
+          <table className="w-full text-sm"><tbody><TableSkeleton rows={5} cols={6} /></tbody></table>
+        </div>
       ) : !data?.length ? (
         <EmptyState title="暂无任务" hint="到批量 RDAP 工具创建查询任务。" action={<Link to="/tools/batch-rdap" className="btn-base btn-primary">前往</Link>} />
       ) : (

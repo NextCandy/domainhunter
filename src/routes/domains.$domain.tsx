@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Eye, ExternalLink, ArrowLeft, Sparkles } from "lucide-react";
 import { AppShell, ScoreBadge, StatusBadge, RiskBadge, EmptyState } from "@/components/app-shell";
+import { CardSkeleton, Skeleton } from "@/components/skeleton";
 import { domainDetailFn, refreshDomainFn, toggleWatchFn, checkRelatedTldsFn, enrichDomainFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
@@ -38,7 +39,7 @@ function DomainDetailPage() {
     onError: (e: any) => toast.error(e?.message ?? "抓取失败"),
   });
 
-  if (isLoading) return <AppShell><div className="card-elev p-10 text-center text-sm text-muted-foreground">加载中…</div></AppShell>;
+  if (isLoading) return <AppShell><CardSkeleton lines={5} /></AppShell>;
 
   if (!data?.domain) {
     return (
@@ -129,7 +130,9 @@ function DomainDetailPage() {
 
         <Card title="相关后缀注册情况">
           {related.isLoading ? (
-            <p className="text-sm text-muted-foreground">检测中…</p>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+              {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-14" />)}
+            </div>
           ) : (
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
               {(related.data ?? []).map(r => (

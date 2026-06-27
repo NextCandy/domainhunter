@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app-shell";
+import { CardSkeleton } from "@/components/skeleton";
 import { getEnrichJobFn, advanceEnrichJobFn, stopEnrichJobFn, resumeEnrichJobFn } from "@/lib/enrich-jobs.functions";
 import { StatusPill, ProgressBar } from "./enrich";
 import { toast } from "sonner";
@@ -15,7 +16,13 @@ function EnrichDetailPage() {
   const { data } = useQuery({
     queryKey: ["enrich-job", id],
     queryFn: () => getEnrichJobFn({ data: { jobId: id } }),
-    refetchInterval: 2000,
+    // Only poll while the job is still working. A terminal job (completed /
+    // stopped / error) must NOT keep refetching every 2s — that churns the page
+    // forever (pegs the renderer) once the detail view is reachable.
+    refetchInterval: (q) => {
+      const s = (q.state.data as any)?.job?.status;
+      return s === "running" || s === "pending" ? 2000 : false;
+    },
   });
 
   const advance = useMutation({
@@ -32,22 +39,22 @@ function EnrichDetailPage() {
   });
 
   const [autoRun, setAutoRun] = useState(true);
-  const lastTick = useRef(0);
 
   useEffect(() => {
-    if (!autoRun || !data?.job) return;
-    const j: any = data.job;
-    if (j.status !== "running" && j.status !== "pending") return;
-    const elapsed = Date.now() - lastTick.current;
+    if (!autoRun) return;
+    const j: any = data?.job;
+    if (!j || (j.status !== "running" && j.status !== "pending")) return;
+    // Serialize: never fire a new advance while one is in flight. Depending on
+    // `advance.isPending` (not the whole mutation object, whose identity changes
+    // every render) is what keeps this from firing dozens of concurrent advances
+    // — that race froze the renderer and double-counted done/cached_hits.
+    if (advance.isPending) return;
     const interval = Math.max(300, 1000 / Math.max(1, j.qps ?? 5));
-    const t = setTimeout(() => {
-      lastTick.current = Date.now();
-      advance.mutate();
-    }, Math.max(0, interval - elapsed));
+    const t = setTimeout(() => advance.mutate(), interval);
     return () => clearTimeout(t);
-  }, [data, autoRun, advance]);
+  }, [data, autoRun, advance.isPending]);
 
-  if (!data) return <AppShell><div className="text-sm text-muted-foreground">加载中…</div></AppShell>;
+  if (!data) return <AppShell><CardSkeleton lines={5} /></AppShell>;
   const j: any = data.job;
   const processed = j.done + j.cached_hits + j.failed;
   const pct = j.total > 0 ? (processed / j.total) * 100 : 0;

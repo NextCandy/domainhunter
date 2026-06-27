@@ -19,6 +19,7 @@ type SettingsShape = {
   notify_telegram?: string;
   notify_bark?: string;
   notify_webhook?: string;
+  notify_before_drop_days?: number;
   // Global RDAP limits (defaults applied in UI forms)
   limit_default_qps?: number;
   limit_default_concurrency?: number;
@@ -110,6 +111,7 @@ function AdminSettings() {
           {T("notify_telegram", "Telegram Bot Token", "")}
           {T("notify_bark", "Bark URL", "https://api.day.app/xxx")}
           {T("notify_webhook", "Webhook URL", "https://...")}
+          {N("notify_before_drop_days", "删除前提醒窗口", { min: 1, max: 30, default: 3 }, " 天")}
         </div>
         <div className="mt-3 flex items-center gap-2">
           <button onClick={() => testNotify.mutate()} disabled={testNotify.isPending || (!form.notify_bark && !form.notify_webhook)} className="btn-base btn-ghost"><Send className="h-4 w-4" />{testNotify.isPending ? "发送中…" : "发送测试通知"}</button>

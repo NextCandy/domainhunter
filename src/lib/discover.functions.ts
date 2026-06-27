@@ -3,18 +3,39 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { pgShim } from "./pg-shim.server";
-import type { Database } from "@/integrations/supabase/types";
+import { query } from "./db.server";
 import { scoreDomain, classifyDomain, DEFAULT_WEIGHTS, type ScoringWeights } from "./scoring";
 import { lookupDomain } from "./rdap.server";
 import { fetchDns, fetchArchive, sendNotification } from "./enrich.server";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertAdmin } from "./admin-guard.server";
 
 function sbAdmin() {
   return pgShim;
 }
 
 const TLD_SAFE = /^[a-z0-9-]+$/i;
+
+async function ensureAdminUser() {
+  const [{ getRequest }, { hasRole, verifyToken }] = await Promise.all([
+    import("@tanstack/react-start/server"),
+    import("@/lib/auth.server"),
+  ]);
+  const authHeader = getRequest()?.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) throw new Error("未登录或登录已过期");
+  let claims: { sub?: string };
+  try {
+    claims = verifyToken(authHeader.replace("Bearer ", "").trim());
+  } catch {
+    throw new Error("未登录或登录已过期");
+  }
+  if (!claims.sub || !(await hasRole(claims.sub, "admin"))) {
+    throw new Error("仅管理员可访问该操作");
+  }
+}
+
+async function encryptServerSecret(value: string) {
+  const { encryptSecret } = await import("@/lib/secret-crypto.server");
+  return encryptSecret(value);
+}
 
 export function parseDomain(input: string): { domain: string; name: string; tld: string } | null {
   const d = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
@@ -55,6 +76,40 @@ export const overviewStatsFn = createServerFn({ method: "GET" }).handler(async (
     watching: watching.count ?? 0,
     featured: featured.data ?? [],
   };
+});
+
+export const overviewTrendFn = createServerFn({ method: "GET" }).handler(async () => {
+  const { rows } = await query<{
+    day: string;
+    today_new: string;
+    available: string;
+    high_score: string;
+  }>(`
+    WITH days AS (
+      SELECT generate_series(
+        date_trunc('day', now()) - interval '6 days',
+        date_trunc('day', now()),
+        interval '1 day'
+      ) AS day
+    )
+    SELECT
+      to_char(days.day, 'MM-DD') AS day,
+      COUNT(d.id)::text AS today_new,
+      COUNT(d.id) FILTER (WHERE d.status = 'available')::text AS available,
+      COUNT(d.id) FILTER (WHERE d.score >= 70)::text AS high_score
+    FROM days
+    LEFT JOIN public.domains d
+      ON d.created_at >= days.day
+     AND d.created_at < days.day + interval '1 day'
+    GROUP BY days.day
+    ORDER BY days.day
+  `);
+  return rows.map((row) => ({
+    day: row.day,
+    todayNew: Number(row.today_new),
+    available: Number(row.available),
+    highScore: Number(row.high_score),
+  }));
 });
 
 // ───────── Discover (paginated, filterable) ─────────
@@ -120,6 +175,22 @@ export const discoverFn = createServerFn({ method: "POST" })
     return { rows: filtered, total: count ?? 0 };
   });
 
+// ───────── Delete domains (single + batch) ─────────
+// Removes rows from `domains`; domain_metrics / domain_whois / domain_dns /
+// watchlist all cascade via ON DELETE CASCADE.
+export const deleteDomainsFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({
+    domains: z.array(z.string().min(1).max(253)).min(1).max(5000),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = sbAdmin();
+    const list = Array.from(new Set(data.domains.map(s => s.trim().toLowerCase()).filter(Boolean)));
+    if (!list.length) return { deleted: 0 };
+    const { error } = await sb.from("domains").delete().in("domain", list);
+    if (error) throw new Error(error.message);
+    return { deleted: list.length };
+  });
+
 // ───────── Import (TXT / CSV) ─────────
 const ImportSchema = z.object({
   source: z.string().trim().max(80).default("manual"),
@@ -135,7 +206,7 @@ export const importDomainsFn = createServerFn({ method: "POST" })
     const lines = data.text.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
     const weights = await getWeights();
     const seen = new Set<string>();
-    const rows: Database["public"]["Tables"]["domains"]["Insert"][] = [];
+    const rows: any[] = [];
     for (const raw of lines.slice(0, 50_000)) {
       const first = raw.split(/[,;\t]/)[0];
       const parsed = parseDomain(first ?? "");
@@ -406,7 +477,7 @@ export const listSourcesFn = createServerFn({ method: "GET" }).handler(async () 
 
 export const upsertSourceFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({
-    id: z.number().int().optional(),
+    id: z.coerce.number().int().optional(),
     name: z.string().min(1).max(80),
     type: z.string().max(30).default("manual"),
     url: z.string().max(500).optional(),
@@ -443,14 +514,9 @@ export const listRegistrarsFn = createServerFn({ method: "GET" }).handler(async 
   return data ?? [];
 });
 
-function pseudoEncrypt(plain: string) {
-  // Server-side opaque storage (NOT real crypto — placeholder until KMS wired up).
-  return plain ? Buffer.from(plain, "utf8").toString("base64") : null;
-}
-
 export const upsertRegistrarFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({
-    id: z.number().int().optional(),
+    id: z.coerce.number().int().optional(),
     name: z.string().min(1).max(80),
     api_key: z.string().max(500).optional(),
     api_secret: z.string().max(500).optional(),
@@ -459,24 +525,40 @@ export const upsertRegistrarFn = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data }) => {
     const sb = sbAdmin();
+    const name = data.name.trim();
     const patch: any = {
-      name: data.name, enabled: data.enabled,
+      name, enabled: data.enabled,
       buy_url_template: data.buy_url_template ?? null,
     };
-    if (data.api_key) patch.api_key_encrypted = pseudoEncrypt(data.api_key);
-    if (data.api_secret) patch.api_secret_encrypted = pseudoEncrypt(data.api_secret);
+    if (data.api_key) patch.api_key_encrypted = await encryptServerSecret(data.api_key);
+    if (data.api_secret) patch.api_secret_encrypted = await encryptServerSecret(data.api_secret);
     if (data.id) {
       const { error } = await sb.from("registrars").update(patch).eq("id", data.id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await sb.from("registrars").insert(patch);
-      if (error) throw new Error(error.message);
+      const { data: existing, error: findError } = await sb
+        .from("registrars")
+        .select("id,name")
+        .ilike("name", name)
+        .maybeSingle();
+      if (findError) throw new Error(findError.message);
+
+      if (existing?.id) {
+        const { error } = await sb
+          .from("registrars")
+          .update({ ...patch, name: existing.name ?? name })
+          .eq("id", existing.id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await sb.from("registrars").insert(patch);
+        if (error) throw new Error(error.message);
+      }
     }
     return { ok: true };
   });
 
 export const deleteRegistrarFn = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ id: z.number().int() }).parse(d))
+  .inputValidator((d: unknown) => z.object({ id: z.coerce.number().int() }).parse(d))
   .handler(async ({ data }) => {
     const sb = sbAdmin();
     await sb.from("registrars").delete().eq("id", data.id);
@@ -640,20 +722,18 @@ export const getTldListFn = createServerFn({ method: "GET" }).handler(async () =
 });
 
 export const saveTldListFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     tlds: z.array(z.string().regex(/^[a-z0-9.\-]+$/i).max(20)).max(1000),
   }).parse(d))
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+  .handler(async ({ data }) => {
+    await ensureAdminUser();
     const sb = sbAdmin();
     const dedup = Array.from(new Set(
       data.tlds.map(t => t.trim().toLowerCase().replace(/^\./, "")).filter(Boolean),
     ));
     const { error } = await sb.from("app_settings").upsert({
-      key: "tld_list", value: dedup as any, updated_at: new Date().toISOString(),
+      key: "tld_list", value: JSON.stringify(dedup) as any, updated_at: new Date().toISOString(),
     });
     if (error) throw new Error(error.message);
     return { ok: true, count: dedup.length };
   });
-

@@ -1,5 +1,4 @@
-// Generic RPC endpoint mirroring `supabase.rpc(name, params)`. Only safe
-// functions are whitelisted; everything else 404s.
+// Generic RPC endpoint. Only safe functions are whitelisted; everything else 404s.
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/api/public/rpc/$name")({

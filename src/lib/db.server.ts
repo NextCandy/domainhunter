@@ -1,6 +1,16 @@
 // Self-hosted Postgres pool. Reads DATABASE_URL (preferred) or PG* envs.
 // Server-only; never import from client modules.
-import { Pool, type PoolClient, type QueryResultRow } from "pg";
+import { Pool, types as pgTypes, type PoolClient, type QueryResultRow } from "pg";
+
+// node-postgres returns int8/bigint (OID 20) as a *string* by default to avoid
+// precision loss. This codebase was written against Supabase (which returns
+// bigint as a JSON number), so every server function validates row ids with
+// `z.number()` and the UI passes ids straight back. Parsing int8 as Number here
+// restores that assumption — without it, all bigserial-id mutations (watchlist
+// update/remove, my-domains, data sources, prices, coupons, ideas delete, ...)
+// fail Zod validation ("expected number, received string"). All ids/counts in
+// this app stay well within JS safe-integer range.
+pgTypes.setTypeParser(20, (v) => (v === null ? null : Number(v)));
 
 declare global {
   // eslint-disable-next-line no-var

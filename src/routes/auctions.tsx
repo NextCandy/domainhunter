@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell, PageHeader, EmptyState } from "@/components/app-shell";
+import { CardSkeleton } from "@/components/skeleton";
 import { listAuctionsFn } from "@/lib/discover.functions";
 
 export const Route = createFileRoute("/auctions")({
@@ -14,7 +15,9 @@ function AuctionsPage() {
     <AppShell>
       <PageHeader title="拍卖域名" description="第三方拍卖 / 一口价聚合。GoDaddy · Namecheap · Dynadot · Gname · Sedo · Catched · Efty（API 待接入）" />
       {isLoading ? (
-        <div className="card-elev p-8 text-center text-sm text-muted-foreground">加载中…</div>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} lines={2} />)}
+        </div>
       ) : !data?.length ? (
         <EmptyState
           title="尚未接入任何拍卖平台"

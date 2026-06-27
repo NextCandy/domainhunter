@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuth } from "@/lib/auth-guards";
+import { query } from "@/lib/db.server";
 
 const ParamsSchema = z.object({
   keywords: z.string().trim().min(1).max(200),
@@ -14,40 +15,37 @@ const ParamsSchema = z.object({
 });
 
 export const generateIdeasFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input: unknown) => ParamsSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { generateIdeas } = await import("./services/domain-generator.server");
     const ideas = await generateIdeas(data);
-    // persist
-    try {
-      await context.supabase.from("domain_ideas").insert({
-        user_id: context.userId,
-        keywords: data.keywords,
-        params: JSON.parse(JSON.stringify(data)),
-        results: JSON.parse(JSON.stringify(ideas)),
-      });
-    } catch {}
+    await query(
+      `INSERT INTO public.domain_ideas (user_id, keywords, params, results)
+       VALUES ($1, $2, $3::jsonb, $4::jsonb)`,
+      [context.userId, data.keywords, JSON.stringify(data), JSON.stringify(ideas)],
+    );
     return { ideas };
   });
 
 export const listIdeasFn = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("domain_ideas")
-      .select("id, keywords, params, results, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20);
-    if (error) throw new Error(error.message);
-    return { items: data ?? [] };
+    const { rows } = await query(
+      `SELECT id, keywords, params, results, created_at
+       FROM public.domain_ideas
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 20`,
+      [context.userId],
+    );
+    return { items: rows };
   });
 
 export const deleteIdeaFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuth])
   .inputValidator((input: unknown) => z.object({ id: z.number().int() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("domain_ideas").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+    await query(`DELETE FROM public.domain_ideas WHERE id = $1 AND user_id = $2`, [data.id, context.userId]);
     return { ok: true };
   });

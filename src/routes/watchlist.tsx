@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { AppShell, PageHeader, EmptyState, ScoreBadge, StatusBadge } from "@/components/app-shell";
+import { CardSkeleton } from "@/components/skeleton";
 import { listWatchlistFn, updateWatchlistFn, removeWatchFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
@@ -53,7 +54,9 @@ function WatchlistPage() {
       )}
 
       {isLoading ? (
-        <div className="card-elev p-8 text-center text-sm text-muted-foreground">加载中…</div>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} lines={2} />)}
+        </div>
       ) : !rows.length ? (
         <EmptyState title="观察列表为空" hint="在发现页或域名详情页点击「观察」按钮加入。" action={<Link to="/discover" className="btn-base btn-primary">去发现域名</Link>} />
       ) : (

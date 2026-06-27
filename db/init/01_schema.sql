@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.app_users (
   password_hash text,
   display_name  text,
   google_sub    text UNIQUE,
+  refresh_token_version integer NOT NULL DEFAULT 0,
   created_at    timestamptz NOT NULL DEFAULT now(),
   last_login_at timestamptz
 );
@@ -180,6 +181,8 @@ CREATE TABLE IF NOT EXISTS public.watchlist (
   notify_before_drop boolean NOT NULL DEFAULT true,
   notify_on_available boolean NOT NULL DEFAULT true,
   notify_on_price_change boolean NOT NULL DEFAULT false,
+  last_notified_at timestamptz,
+  last_notified_status text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(domain_id)
@@ -394,4 +397,14 @@ VALUES
   ('NameSilo', 'namesilo', 'https://www.namesilo.com', true, 'active', 'https://www.namesilo.com/domain/search-domains?query={domain}'),
   ('Cloudflare Registrar', 'cloudflare', 'https://www.cloudflare.com/products/registrar/', true, 'active', 'https://dash.cloudflare.com/?to=/:account/domains/register/{domain}'),
   ('GoDaddy', 'godaddy', 'https://www.godaddy.com', true, 'active', 'https://www.godaddy.com/domainsearch/find?domainToCheck={domain}')
+ON CONFLICT (name) DO NOTHING;
+
+-- 国内域名供应商（支持 .cn / .com.cn 等）
+INSERT INTO public.registrars (name, slug, website, enabled, status, buy_url_template)
+VALUES
+  ('阿里云（万网）', 'aliyun', 'https://wanwang.aliyun.com', true, 'active', 'https://wanwang.aliyun.com/domain/searchresult/?keyword={domain}'),
+  ('腾讯云', 'tencent', 'https://dnspod.cloud.tencent.com', true, 'active', 'https://buy.cloud.tencent.com/domain?searchKey={domain}'),
+  ('西部数码', 'west', 'https://www.west.cn', true, 'active', 'https://www.west.cn/domains/?keyword={domain}'),
+  ('华为云', 'huawei', 'https://www.huaweicloud.com', true, 'active', 'https://www.huaweicloud.com/product/domain.html'),
+  ('新网', 'xinnet', 'https://www.xinnet.com', true, 'active', 'https://www.xinnet.com/domain/searchDomain.html?domain={domain}')
 ON CONFLICT (name) DO NOTHING;

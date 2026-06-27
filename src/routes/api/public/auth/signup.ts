@@ -22,16 +22,18 @@ export const Route = createFileRoute("/api/public/auth/signup")({
           return Response.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
         }
         try {
-          const { findUserByEmail, createUser, signToken } = await import("@/lib/auth.server");
+          const { findUserByEmail, createUser, signToken, signRefreshToken } = await import("@/lib/auth.server");
           const existing = await findUserByEmail(parsed.data.email);
           if (existing) {
             return Response.json({ error: "邮箱已注册" }, { status: 409 });
           }
           const user = await createUser(parsed.data.email, parsed.data.password, parsed.data.displayName);
-          const token = signToken({ sub: user.id, email: user.email });
+          const token = signToken({ sub: user.id, email: user.email, ver: 0 });
+          const refreshToken = signRefreshToken({ sub: user.id, email: user.email, ver: 0 });
           return Response.json({
             user: { id: user.id, email: user.email },
             token,
+            refreshToken,
           });
         } catch (e: any) {
           console.error("[auth/signup]", e);

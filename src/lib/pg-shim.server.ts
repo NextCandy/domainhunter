@@ -1,4 +1,4 @@
-// Supabase PostgREST-compatible query builder over node-postgres.
+// PostgREST-style query builder over node-postgres.
 // Implements the subset of the JS client used in this codebase:
 //   from(t).select/insert/update/upsert/delete + eq/neq/in/gt/gte/lt/lte/is/like/ilike/not/order/limit/range
 //   .single() / .maybeSingle() / { count: "exact"[, head: true] }

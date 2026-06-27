@@ -1,7 +1,49 @@
 // Server-only helpers for RDAP/WHOIS lookups.
 // Imported only from createServerFn handlers (server-side execution).
 
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import net from "node:net";
+import { query } from "@/lib/db.server";
+
+// ── Port-43 WHOIS for ccTLDs that have no public RDAP server ──────────────────
+// .cn / .com.cn / .net.cn / ... are operated by CNNIC, which exposes WHOIS over
+// TCP/43 (whois.cnnic.cn) but is NOT in the IANA RDAP bootstrap. Key is the last
+// label (split(".").pop()), e.g. "x.com.cn" → "cn".
+const WHOIS_SERVERS: Record<string, string> = {
+  cn: "whois.cnnic.cn",
+};
+
+function whoisQuery(server: string, domain: string, timeoutMs: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    const socket = net.connect(43, server);
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => socket.write(domain + "\r\n"));
+    socket.on("data", (chunk) => { data += chunk.toString("utf8"); });
+    socket.once("end", () => resolve(data));
+    socket.once("timeout", () => { socket.destroy(); reject(new Error("WHOIS timeout")); });
+    socket.once("error", (e) => reject(e));
+  });
+}
+
+function parseCnWhois(text: string): DomainInfo {
+  if (/No matching record|the domain you want to register is available|not been registered/i.test(text)) {
+    return { status: "available", source: "whois" };
+  }
+  if (/Domain Name:/i.test(text)) {
+    const grab = (re: RegExp) => text.match(re)?.[1]?.trim() || undefined;
+    return {
+      status: "registered",
+      source: "whois",
+      registrar: grab(/Sponsoring Registrar:\s*(.+)/i),
+      createdDate: grab(/Registration Time:\s*(.+)/i),
+      expiresDate: grab(/Expiration Time:\s*(.+)/i),
+      nameservers: [...text.matchAll(/Name Server:\s*(.+)/gi)].map((m) => m[1].trim().toLowerCase()).filter(Boolean),
+      statuses: [...text.matchAll(/Domain Status:\s*(.+)/gi)].map((m) => m[1].trim()),
+      dnssec: /DNSSEC:\s*signed/i.test(text),
+    };
+  }
+  return { status: "unsupported", source: "whois", error: "WHOIS: unrecognized response" };
+}
 
 interface BootstrapEntry {
   tlds: string[];
@@ -17,23 +59,78 @@ let memoryBootstrap: BootstrapData | null = null;
 let memoryRootZone: Set<string> | null = null;
 
 const BOOTSTRAP_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_RDAP_QPS = 5;
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __domainHunterRdapBucket:
+    | { tokens: number; lastRefill: number; queue: Array<() => void>; qps: number; timer?: ReturnType<typeof setInterval> }
+    | undefined;
+}
+
+function rdapQps() {
+  const configured = Number(process.env.RDAP_GLOBAL_QPS ?? DEFAULT_RDAP_QPS);
+  return Number.isFinite(configured) && configured > 0 ? Math.min(configured, 50) : DEFAULT_RDAP_QPS;
+}
+
+function bucket() {
+  const qps = rdapQps();
+  if (!globalThis.__domainHunterRdapBucket) {
+    globalThis.__domainHunterRdapBucket = { tokens: qps, lastRefill: Date.now(), queue: [], qps };
+  }
+  const b = globalThis.__domainHunterRdapBucket;
+  b.qps = qps;
+  if (!b.timer) {
+    b.timer = setInterval(() => {
+      b.tokens = Math.min(b.qps, b.tokens + Math.max(1, Math.floor(b.qps / 5)));
+      while (b.tokens > 0 && b.queue.length) {
+        b.tokens -= 1;
+        b.queue.shift()?.();
+      }
+    }, 200);
+    b.timer.unref?.();
+  }
+  return b;
+}
+
+async function waitForRdapToken() {
+  const b = bucket();
+  if (b.tokens > 0) {
+    b.tokens -= 1;
+    return;
+  }
+  // RDAP 服务通常有严格频率限制；这里使用进程内令牌桶让单次与批量查询排队等待。
+  await new Promise<void>((resolve) => b.queue.push(resolve));
+}
 
 async function loadCached(key: string): Promise<any | null> {
-  const { data } = await supabaseAdmin
-    .from("tlds_cache")
-    .select("data, updated_at")
-    .eq("key", key)
-    .maybeSingle();
-  if (!data) return null;
-  const age = Date.now() - new Date((data as any).updated_at).getTime();
-  if (age > BOOTSTRAP_TTL_MS) return null;
-  return (data as any).data;
+  try {
+    const { rows } = await query<{ data: unknown; updated_at: string }>(
+      `SELECT data, updated_at FROM public.tlds_cache WHERE key = $1 LIMIT 1`,
+      [key],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    const age = Date.now() - new Date(row.updated_at).getTime();
+    if (age > BOOTSTRAP_TTL_MS) return null;
+    return row.data;
+  } catch (error: any) {
+    console.error(`[RDAP缓存] 读取 ${key} 失败:`, error?.message ?? error);
+    return null;
+  }
 }
 
 async function saveCached(key: string, value: any) {
-  await supabaseAdmin
-    .from("tlds_cache")
-    .upsert({ key, data: value, updated_at: new Date().toISOString() });
+  try {
+    await query(
+      `INSERT INTO public.tlds_cache (key, data, updated_at)
+       VALUES ($1, $2::jsonb, now())
+       ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+      [key, JSON.stringify(value)],
+    );
+  } catch (error: any) {
+    console.error(`[RDAP缓存] 写入 ${key} 失败:`, error?.message ?? error);
+  }
 }
 
 export async function getBootstrap(): Promise<BootstrapData> {
@@ -170,6 +267,7 @@ export async function lookupDomain(
       try {
         const base = server.endsWith("/") ? server : server + "/";
         const url = base + "domain/" + encodeURIComponent(domain);
+        await waitForRdapToken();
         const res = await fetch(url, {
           headers: { Accept: "application/rdap+json, application/json" },
           signal: AbortSignal.timeout(timeoutMs),
@@ -205,8 +303,28 @@ export async function lookupDomain(
     return { status: "error", source: "rdap", error: lastErr?.message || "RDAP error" };
   }
 
+  // No RDAP server for this TLD — try a direct port-43 WHOIS server if we know
+  // one (e.g. CNNIC for .cn / .com.cn).
+  const whoisServer = WHOIS_SERVERS[tld];
+  if (whoisServer) {
+    let lastErr: any;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        await waitForRdapToken();
+        const info = parseCnWhois(await whoisQuery(whoisServer, domain, timeoutMs));
+        if (info.status !== "unsupported") return info;
+        lastErr = new Error(info.error || "WHOIS: unrecognized response");
+      } catch (e: any) {
+        lastErr = e;
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      }
+    }
+    return { status: "error", source: "whois", error: lastErr?.message || "WHOIS error" };
+  }
+
   // No RDAP - try IANA WHOIS web fallback (best-effort)
   try {
+    await waitForRdapToken();
     const res = await fetch(`https://www.iana.org/whois?q=${encodeURIComponent(domain)}`, {
       signal: AbortSignal.timeout(timeoutMs),
     });

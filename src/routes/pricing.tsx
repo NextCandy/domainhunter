@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Search, ExternalLink, Tag, Sparkles, ShieldCheck, Zap, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, PageHeader, EmptyState } from "@/components/app-shell";
+import { TableSkeleton } from "@/components/skeleton";
 import { compareTldFn, recordPurchaseFn } from "@/lib/pricing.functions";
 
 const searchSchema = z.object({
@@ -142,7 +143,7 @@ function PricingPage() {
           <span className="text-xs text-muted-foreground">{rows.length} 个</span>
         </header>
         {q.isLoading ? (
-          <div className="px-5 py-10 text-center text-sm text-muted-foreground">查询中…</div>
+          <table className="w-full text-sm"><tbody><TableSkeleton rows={5} cols={8} /></tbody></table>
         ) : rows.length === 0 ? (
           <EmptyState title="暂无该 TLD 的价格数据" hint="可前往 后台 → 价格管理 添加各注册商的价格。" />
         ) : (

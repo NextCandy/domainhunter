@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+import { getCurrentUser, login, register } from "@/lib/auth-client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -15,10 +14,9 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // If already signed in, leave.
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) nav({ to: "/" });
+    getCurrentUser().then((user) => {
+      if (user) nav({ to: "/" });
     });
   }, [nav]);
 
@@ -31,37 +29,18 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-        toast.success("注册成功，请登录（首位注册用户自动成为管理员）");
-        setMode("signin");
+        await register(email, password);
+        toast.success("注册成功，首位注册用户会自动成为管理员");
+        nav({ to: "/" });
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        await login(email, password);
         toast.success("登录成功");
         nav({ to: "/" });
       }
     } catch (err: any) {
-      toast.error(err?.message ?? "操作失败");
+      const message = String(err?.message ?? "操作失败");
+      toast.error(message.includes("fetch") ? "网络异常，请稍后重试" : message);
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function google() {
-    setBusy(true);
-    try {
-      const r = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-      });
-      if (r.error) throw r.error;
-      if (!r.redirected) nav({ to: "/" });
-    } catch (err: any) {
-      toast.error(err?.message ?? "Google 登录失败");
       setBusy(false);
     }
   }
@@ -90,15 +69,6 @@ function AuthPage() {
             {busy ? "处理中…" : mode === "signin" ? "登录" : "注册"}
           </button>
         </form>
-
-        <div className="my-4 flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="h-px flex-1 bg-border" />或<div className="h-px flex-1 bg-border" />
-        </div>
-
-        <button onClick={google} disabled={busy}
-          className="btn-base btn-ghost w-full justify-center border border-border">
-          使用 Google 登录
-        </button>
 
         <div className="mt-4 text-center text-xs text-muted-foreground">
           {mode === "signin" ? (

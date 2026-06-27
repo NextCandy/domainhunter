@@ -1,7 +1,8 @@
 // Enrich jobs: DNS / Archive / SEO bulk fetching with cache + resume.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAdmin } from "@/lib/auth-guards";
+import { pgShim } from "@/lib/pg-shim.server";
 
 export const ENRICH_LIMITS = {
   concurrency: { min: 1, max: 20, default: 5 },
@@ -25,16 +26,14 @@ const createSchema = z.object({
 });
 
 export const createEnrichJobFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => createSchema.parse(d))
-  .handler(async ({ data, context }) => {
-    const { assertAdmin } = await import("./admin-guard.server");
-    await assertAdmin(context.supabase as any, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  .handler(async ({ data }) => {
+    const db = pgShim;
 
     const uniqDomains = Array.from(new Set(data.domains.map(d => d.toLowerCase().trim()).filter(Boolean)));
 
-    const { data: job, error } = await supabaseAdmin.from("enrich_jobs").insert({
+    const { data: job, error } = await db.from("enrich_jobs").insert({
       name: data.name,
       kinds: data.kinds,
       scope: data.scope,
@@ -56,7 +55,7 @@ export const createEnrichJobFn = createServerFn({ method: "POST" })
     }
     const CHUNK = 1000;
     for (let i = 0; i < rows.length; i += CHUNK) {
-      const { error: ie } = await supabaseAdmin.from("enrich_items").insert(rows.slice(i, i + CHUNK));
+      const { error: ie } = await db.from("enrich_items").insert(rows.slice(i, i + CHUNK));
       if (ie) throw new Error(ie.message);
     }
     return { id: job.id, total: rows.length };
@@ -65,31 +64,27 @@ export const createEnrichJobFn = createServerFn({ method: "POST" })
 const jobIdSchema = z.object({ jobId: z.string().uuid() });
 
 export const listEnrichJobsFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { assertAdmin } = await import("./admin-guard.server");
-    await assertAdmin(context.supabase as any, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("enrich_jobs").select("*").order("created_at", { ascending: false }).limit(100);
+  .middleware([requireAdmin])
+  .handler(async () => {
+    const db = pgShim;
+    const { data } = await db.from("enrich_jobs").select("*").order("created_at", { ascending: false }).limit(100);
     return data ?? [];
   });
 
 export const getEnrichJobFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => jobIdSchema.parse(d))
-  .handler(async ({ data, context }) => {
-    const { assertAdmin } = await import("./admin-guard.server");
-    await assertAdmin(context.supabase as any, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: job } = await supabaseAdmin.from("enrich_jobs").select("*").eq("id", data.jobId).maybeSingle();
+  .handler(async ({ data }) => {
+    const db = pgShim;
+    const { data: job } = await db.from("enrich_jobs").select("*").eq("id", data.jobId).maybeSingle();
     if (!job) throw new Error("任务不存在");
-    const { data: recent } = await supabaseAdmin
+    const { data: recent } = await db
       .from("enrich_items")
       .select("id, domain, kind, status, error, attempted_at")
       .eq("enrich_job_id", data.jobId)
       .order("attempted_at", { ascending: false, nullsFirst: false })
       .limit(50);
-    const { data: errs } = await supabaseAdmin
+    const { data: errs } = await db
       .from("enrich_items")
       .select("id, domain, kind, error, attempted_at")
       .eq("enrich_job_id", data.jobId)
@@ -100,27 +95,23 @@ export const getEnrichJobFn = createServerFn({ method: "POST" })
   });
 
 export const stopEnrichJobFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => jobIdSchema.parse(d))
-  .handler(async ({ data, context }) => {
-    const { assertAdmin } = await import("./admin-guard.server");
-    await assertAdmin(context.supabase as any, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("enrich_jobs").update({ status: "stopped", finished_at: new Date().toISOString() }).eq("id", data.jobId);
+  .handler(async ({ data }) => {
+    const db = pgShim;
+    await db.from("enrich_jobs").update({ status: "stopped", finished_at: new Date().toISOString() }).eq("id", data.jobId);
     return { ok: true };
   });
 
 export const resumeEnrichJobFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => jobIdSchema.parse(d))
-  .handler(async ({ data, context }) => {
-    const { assertAdmin } = await import("./admin-guard.server");
-    await assertAdmin(context.supabase as any, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  .handler(async ({ data }) => {
+    const db = pgShim;
     // Reset any 'running' items back to pending (interrupted) and re-open job
-    await supabaseAdmin.from("enrich_items").update({ status: "pending" })
+    await db.from("enrich_items").update({ status: "pending" })
       .eq("enrich_job_id", data.jobId).eq("status", "running");
-    await supabaseAdmin.from("enrich_jobs").update({ status: "pending", finished_at: null }).eq("id", data.jobId);
+    await db.from("enrich_jobs").update({ status: "pending", finished_at: null }).eq("id", data.jobId);
     return { ok: true };
   });
 
@@ -130,25 +121,23 @@ const advanceSchema = z.object({
 });
 
 export const advanceEnrichJobFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => advanceSchema.parse(d))
-  .handler(async ({ data, context }) => {
-    const { assertAdmin } = await import("./admin-guard.server");
-    await assertAdmin(context.supabase as any, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  .handler(async ({ data }) => {
+    const db = pgShim;
 
-    const { data: job } = await supabaseAdmin.from("enrich_jobs").select("*").eq("id", data.jobId).maybeSingle();
+    const { data: job } = await db.from("enrich_jobs").select("*").eq("id", data.jobId).maybeSingle();
     if (!job) throw new Error("任务不存在");
     if ((job as any).status === "stopped") return { processed: 0, remaining: 0, stopped: true };
 
     if ((job as any).status === "pending") {
-      await supabaseAdmin.from("enrich_jobs").update({
+      await db.from("enrich_jobs").update({
         status: "running",
         started_at: (job as any).started_at ?? new Date().toISOString(),
       }).eq("id", data.jobId);
     }
 
-    const { data: items } = await supabaseAdmin
+    const { data: items } = await db
       .from("enrich_items")
       .select("id, domain, kind")
       .eq("enrich_job_id", data.jobId)
@@ -162,7 +151,7 @@ export const advanceEnrichJobFn = createServerFn({ method: "POST" })
     }
 
     // Mark batch running
-    await supabaseAdmin.from("enrich_items").update({ status: "running" })
+    await db.from("enrich_items").update({ status: "running" })
       .in("id", pending.map(p => p.id));
 
     const ttl = (job as any).cache_ttl_seconds as number;
@@ -186,7 +175,7 @@ export const advanceEnrichJobFn = createServerFn({ method: "POST" })
         failed++;
       }
       updates.push(
-        supabaseAdmin.from("enrich_items").update({
+        db.from("enrich_items").update({
           status, result, error, attempted_at: new Date().toISOString(),
         }).eq("id", it.id).then((x: any) => x),
       );
@@ -194,10 +183,10 @@ export const advanceEnrichJobFn = createServerFn({ method: "POST" })
     await Promise.allSettled(updates);
 
     // Aggregate
-    const { data: cur } = await supabaseAdmin.from("enrich_jobs").select("done, failed, cached_hits").eq("id", data.jobId).single();
+    const { data: cur } = await db.from("enrich_jobs").select("done, failed, cached_hits").eq("id", data.jobId).single();
     if (cur) {
       const c = cur as any;
-      await supabaseAdmin.from("enrich_jobs").update({
+      await db.from("enrich_jobs").update({
         done: c.done + done,
         failed: c.failed + failed,
         cached_hits: c.cached_hits + cached,
@@ -205,7 +194,7 @@ export const advanceEnrichJobFn = createServerFn({ method: "POST" })
       }).eq("id", data.jobId);
     }
 
-    const { count } = await supabaseAdmin
+    const { count } = await db
       .from("enrich_items").select("id", { count: "exact", head: true })
       .eq("enrich_job_id", data.jobId).eq("status", "pending");
     const remaining = count ?? 0;
@@ -214,21 +203,21 @@ export const advanceEnrichJobFn = createServerFn({ method: "POST" })
   });
 
 async function finalizeIfDone(jobId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { count: stillPending } = await supabaseAdmin
+  const db = pgShim;
+  const { count: stillPending } = await db
     .from("enrich_items").select("id", { count: "exact", head: true })
     .eq("enrich_job_id", jobId).in("status", ["pending", "running"]);
   if ((stillPending ?? 0) === 0) {
-    await supabaseAdmin.from("enrich_jobs").update({
+    await db.from("enrich_jobs").update({
       status: "completed", finished_at: new Date().toISOString(),
     }).eq("id", jobId);
   }
 }
 
 async function processOne(it: { domain: string; kind: Kind }, ttl: number): Promise<{ cached?: boolean; skipped?: boolean; payload: any }> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = pgShim;
   // Cache check
-  const { data: cache } = await supabaseAdmin.from("enrich_cache")
+  const { data: cache } = await db.from("enrich_cache")
     .select("payload, fetched_at, ttl_seconds")
     .eq("domain", it.domain).eq("kind", it.kind).maybeSingle();
   if (cache) {
@@ -253,7 +242,7 @@ async function processOne(it: { domain: string; kind: Kind }, ttl: number): Prom
     else payload = r;
   }
   // Upsert cache (even skipped, with short ttl to avoid storms)
-  await supabaseAdmin.from("enrich_cache").upsert({
+  await db.from("enrich_cache").upsert({
     domain: it.domain, kind: it.kind, payload,
     fetched_at: new Date().toISOString(),
     ttl_seconds: skipped ? Math.min(ttl, 3600) : ttl,
@@ -263,8 +252,8 @@ async function processOne(it: { domain: string; kind: Kind }, ttl: number): Prom
 
 // Called by rdap job completion hook
 export async function maybeAutoEnrich(sourceJobId: string) {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: job } = await supabaseAdmin.from("jobs").select("name, params").eq("id", sourceJobId).maybeSingle();
+  const db = pgShim;
+  const { data: job } = await db.from("jobs").select("name, params").eq("id", sourceJobId).maybeSingle();
   if (!job) return;
   const ae = ((job as any).params ?? {}).auto_enrich as
     | { enabled?: boolean; kinds?: string[]; scope?: "available" | "registered" | "all" }
@@ -273,14 +262,14 @@ export async function maybeAutoEnrich(sourceJobId: string) {
   const kinds = (ae.kinds ?? ["dns", "archive"]).filter(k => ["dns","archive","seo"].includes(k));
   if (kinds.length === 0) return;
   const scope = ae.scope ?? "available";
-  let q = supabaseAdmin.from("job_items").select("domain").eq("job_id", sourceJobId);
+  let q = db.from("job_items").select("domain").eq("job_id", sourceJobId);
   if (scope === "available") q = q.eq("status", "available");
   else if (scope === "registered") q = q.in("status", ["registered", "reserved"]);
   const { data: items } = await q.limit(200_000);
   const domains = Array.from(new Set((items ?? []).map((x: any) => String(x.domain).toLowerCase())));
   if (domains.length === 0) return;
 
-  const { data: ej } = await supabaseAdmin.from("enrich_jobs").insert({
+  const { data: ej } = await db.from("enrich_jobs").insert({
     name: `自动丰富 · ${(job as any).name}`,
     kinds, scope, source_job_id: sourceJobId,
     total: domains.length * kinds.length, status: "pending",
@@ -290,6 +279,6 @@ export async function maybeAutoEnrich(sourceJobId: string) {
     enrich_job_id: (ej as any).id, domain: d, kind: k, status: "pending",
   })));
   for (let i = 0; i < rows.length; i += 1000) {
-    await supabaseAdmin.from("enrich_items").insert(rows.slice(i, i + 1000));
+    await db.from("enrich_items").insert(rows.slice(i, i + 1000));
   }
 }

@@ -1,7 +1,9 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useIsFetching, useIsMutating } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { Menu, X, Search, LogOut } from "lucide-react";
+import { Menu, X, Search, LogOut, Moon, Sun } from "lucide-react";
 import { useAuth, signOut } from "@/lib/auth-client";
+import { Skeleton } from "@/components/skeleton";
 
 const NAV = [
   { to: "/", label: "概览" },
@@ -20,15 +22,41 @@ const NAV = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: s => s.location.pathname });
   const [open, setOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const auth = useAuth();
   const nav = useNavigate();
+  const busyCount = useIsFetching() + useIsMutating();
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("dh.theme");
+    const next = saved === "dark" || saved === "light"
+      ? saved
+      : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    setTheme(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    window.localStorage.setItem("dh.theme", next);
+    document.documentElement.classList.toggle("dark", next === "dark");
+  }
 
   useEffect(() => {
     if (!auth.loading && !auth.userId) nav({ to: "/auth" });
   }, [auth.loading, auth.userId, nav]);
 
   if (auth.loading) {
-    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">加载中…</div>;
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-6">
+        <div className="w-full max-w-sm space-y-3">
+          <Skeleton className="mx-auto h-10 w-10" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="mx-auto h-4 w-2/3" />
+        </div>
+      </div>
+    );
   }
   if (!auth.userId) return null;
   if (!auth.isAdmin) {
@@ -45,6 +73,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <div
+        className={`fixed left-0 top-0 z-50 h-0.5 bg-primary transition-all duration-300 ${busyCount ? "w-2/3 opacity-100" : "w-full opacity-0"}`}
+      />
       <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 py-3 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
@@ -70,6 +101,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "切换到亮色" : "切换到暗色"}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground hover:text-foreground"
+              aria-label={theme === "dark" ? "切换到亮色" : "切换到暗色"}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
             <Link to="/discover" className="hidden items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-muted-foreground hover:border-border-strong hover:text-foreground sm:flex">
               <Search className="h-4 w-4" />
               <span className="hidden md:inline">搜索域名…</span>
@@ -112,6 +152,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </Link>
                 );
               })}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground hover:bg-accent"
+              >
+                {theme === "dark" ? "切换到亮色模式" : "切换到暗色模式"}
+              </button>
             </nav>
           </div>
         )}

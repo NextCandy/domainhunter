@@ -1,5 +1,5 @@
-// Server-only domain idea generator. Uses Lovable AI Gateway when LOVABLE_API_KEY
-// is configured; otherwise falls back to a deterministic rule-based generator.
+// Server-only domain idea generator. Uses an OpenAI-compatible API when
+// AI_API_KEY is configured; otherwise falls back to a deterministic generator.
 
 import type { DomainIdea, IdeaGenParams } from "./types";
 
@@ -75,8 +75,10 @@ function ruleBased(params: IdeaGenParams): DomainIdea[] {
   return out.sort((a, b) => (b.memorability + b.brandability) - (a.memorability + a.brandability));
 }
 
-async function aiGenerate(params: IdeaGenParams, apiKey: string): Promise<DomainIdea[] | null> {
+async function aiGenerate(params: IdeaGenParams, apiKey: string): Promise<DomainIdea[]> {
   const tlds = (params.tlds?.length ? params.tlds : TLD_DEFAULT).map(t => t.replace(/^\./, ""));
+  const baseUrl = (process.env.AI_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
+  const model = process.env.AI_MODEL || "deepseek-v4-flash";
   const sys = `你是域名命名专家。根据用户需求生成域名候选。只输出 JSON 数组，不要额外文字。每项 schema:
 {"domain":string,"name":string,"tld":string,"length":number,"reason":string,"useCase":string,"memorability":number,"brandability":number,"recommend":boolean,"strategy":string}
 规则: 名称尽量短(${params.minLen ?? 3}-${params.maxLen ?? 14}字符)、好记、避免连字符、避免已知大品牌近似、memorability/brandability 在 0-100。`;
@@ -87,15 +89,14 @@ async function aiGenerate(params: IdeaGenParams, apiKey: string): Promise<Domain
 后缀候选: ${tlds.join(", ")}
 数量: ${Math.min(30, Math.max(5, params.count ?? 12))}`;
 
-  try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const resp = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model,
         messages: [
           { role: "system", content: sys },
           { role: "user", content: user },
@@ -103,38 +104,37 @@ async function aiGenerate(params: IdeaGenParams, apiKey: string): Promise<Domain
         response_format: { type: "json_object" },
       }),
     });
-    if (!resp.ok) return null;
-    const json = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content ?? "";
-    // Try to extract a JSON array from response
-    const match = content.match(/\[[\s\S]*\]/);
-    const raw = match ? match[0] : content;
-    const parsed = JSON.parse(raw) as DomainIdea[] | { ideas: DomainIdea[] };
-    const arr = Array.isArray(parsed) ? parsed : (parsed.ideas ?? []);
-    return arr
-      .filter(x => x && typeof x.domain === "string")
-      .map(x => ({
-        domain: x.domain.toLowerCase(),
-        name: x.name?.toLowerCase() ?? x.domain.split(".")[0],
-        tld: x.tld?.toLowerCase() ?? x.domain.split(".").slice(1).join("."),
-        length: x.length ?? (x.name?.length ?? 0),
-        reason: x.reason ?? "",
-        useCase: x.useCase ?? "",
-        memorability: Math.max(0, Math.min(100, Number(x.memorability) || 60)),
-        brandability: Math.max(0, Math.min(100, Number(x.brandability) || 60)),
-        recommend: Boolean(x.recommend),
-        strategy: x.strategy ?? "ai",
-      }));
-  } catch {
-    return null;
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`AI 请求失败：HTTP ${resp.status}${text ? `，${text.slice(0, 200)}` : ""}`);
   }
+  const json = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const content = json.choices?.[0]?.message?.content ?? "";
+  const match = content.match(/\[[\s\S]*\]/);
+  const raw = match ? match[0] : content;
+  const parsed = JSON.parse(raw) as DomainIdea[] | { ideas: DomainIdea[] };
+  const arr = Array.isArray(parsed) ? parsed : (parsed.ideas ?? []);
+  return arr
+    .filter(x => x && typeof x.domain === "string")
+    .map(x => ({
+      domain: x.domain.toLowerCase(),
+      name: x.name?.toLowerCase() ?? x.domain.split(".")[0],
+      tld: x.tld?.toLowerCase() ?? x.domain.split(".").slice(1).join("."),
+      length: x.length ?? (x.name?.length ?? 0),
+      reason: x.reason ?? "",
+      useCase: x.useCase ?? "",
+      memorability: Math.max(0, Math.min(100, Number(x.memorability) || 60)),
+      brandability: Math.max(0, Math.min(100, Number(x.brandability) || 60)),
+      recommend: Boolean(x.recommend),
+      strategy: x.strategy ?? "ai",
+    }));
 }
 
 export async function generateIdeas(params: IdeaGenParams): Promise<DomainIdea[]> {
-  const key = process.env.LOVABLE_API_KEY;
+  const key = process.env.AI_API_KEY;
   if (key) {
     const ai = await aiGenerate(params, key);
-    if (ai && ai.length > 0) return ai;
+    if (ai.length > 0) return ai;
   }
   return ruleBased(params);
 }

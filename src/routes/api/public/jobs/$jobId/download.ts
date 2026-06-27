@@ -25,9 +25,10 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
         if (!VALID_KINDS.includes(kind)) {
           return new Response(`Bad kind: ${kind}`, { status: 400 });
         }
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { pgShim } = await import("@/lib/pg-shim.server");
+        const db = pgShim;
 
-        const { data: job } = await supabaseAdmin
+        const { data: job } = await db
           .from("jobs")
           .select("name")
           .eq("id", jobId)
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
         let contentType = "text/plain; charset=utf-8";
 
         if (kind === "available") {
-          const { data } = await supabaseAdmin
+          const { data } = await db
             .from("job_items")
             .select("domain")
             .eq("job_id", jobId)
@@ -48,7 +49,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
           body = (data || []).map((r: any) => r.domain).join("\n") + "\n";
           filename = "available.txt";
         } else if (kind === "errors") {
-          const { data } = await supabaseAdmin
+          const { data } = await db
             .from("job_items")
             .select("domain, error")
             .eq("job_id", jobId)
@@ -64,7 +65,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
           const PAGE = 1000;
           let from = 0;
           while (true) {
-            const { data, error } = await supabaseAdmin
+            const { data, error } = await db
               .from("job_events")
               .select("created_at, level, event, message, meta")
               .eq("job_id", jobId)
@@ -91,7 +92,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
         } else if (kind === "error-report") {
           contentType = "application/json; charset=utf-8";
           filename = "error_report.json";
-          const { data: items } = await supabaseAdmin
+          const { data: items } = await db
             .from("job_items")
             .select("domain, error, checked_at")
             .eq("job_id", jobId)
@@ -127,7 +128,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
           const PAGE = 1000;
           let from = 0;
           while (true) {
-            const { data, error } = await supabaseAdmin
+            const { data, error } = await db
               .from("job_items")
               .select("domain, tld, status, info, error")
               .eq("job_id", jobId)
@@ -155,7 +156,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
           const PAGE = 1000;
           let from = 0;
           while (true) {
-            const { data, error } = await supabaseAdmin
+            const { data, error } = await db
               .from("job_items")
               .select("domain, status, info, error")
               .eq("job_id", jobId)

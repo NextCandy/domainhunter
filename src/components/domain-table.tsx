@@ -1,7 +1,7 @@
 // Domain table + filter panel + mobile cards. Shared by /discover and its presets.
 import { Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
-import { Eye, ExternalLink, RefreshCw, Filter, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { useState, useEffect, type ReactNode } from "react";
+import { Eye, ExternalLink, RefreshCw, Filter, ChevronLeft, ChevronRight, Sparkles, Trash2 } from "lucide-react";
 import { ScoreBadge, StatusBadge, RiskBadge, EmptyState } from "./app-shell";
 import type { DiscoverFilters } from "@/lib/discover.functions";
 
@@ -309,7 +309,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function DomainTable({
-  rows, total, filters, onChange, onWatch, onRefresh, onEnrich,
+  rows, total, filters, onChange, onWatch, onRefresh, onEnrich, onDelete,
 }: {
   rows: DomainRow[];
   total: number;
@@ -318,8 +318,31 @@ export function DomainTable({
   onWatch?: (d: DomainRow) => void;
   onRefresh?: (d: DomainRow) => void;
   onEnrich?: (d: DomainRow) => void;
+  onDelete?: (domains: string[]) => void;
 }) {
   const pages = Math.max(1, Math.ceil(total / filters.pageSize));
+
+  // ── Row selection for batch delete (local UI state) ──
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Clear selection whenever the visible page / filters change.
+  useEffect(() => { setSelected(new Set()); }, [filters.page, filters.pageSize, filters.statuses, filters.q]);
+  const allOnPage = rows.length > 0 && rows.every(r => selected.has(r.domain));
+  const toggleOne = (d: string) => setSelected(prev => {
+    const n = new Set(prev); if (n.has(d)) n.delete(d); else n.add(d); return n;
+  });
+  const toggleAll = () => setSelected(() => allOnPage ? new Set() : new Set(rows.map(r => r.domain)));
+  // In-page (non-blocking) delete confirmation. Avoids window.confirm so the flow
+  // stays consistent with the app's UI and is testable.
+  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
+  const requestDelete = (domains: string[]) => {
+    if (!onDelete || !domains.length) return;
+    setPendingDelete(domains);
+  };
+  const doDelete = () => {
+    if (onDelete && pendingDelete?.length) onDelete(pendingDelete);
+    setPendingDelete(null);
+    setSelected(new Set());
+  };
   const setSort = (col: DiscoverFilters["sortBy"]) => {
     if (filters.sortBy === col) onChange({ ...filters, sortDir: filters.sortDir === "asc" ? "desc" : "asc" });
     else onChange({ ...filters, sortBy: col, sortDir: "desc" });
@@ -332,12 +355,40 @@ export function DomainTable({
 
   return (
     <div className="space-y-3">
+      {/* Delete confirmation (in-page, non-blocking) */}
+      {onDelete && pendingDelete && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
+          <span className="text-destructive">
+            {pendingDelete.length === 1
+              ? <>确定删除域名「<span className="font-medium">{pendingDelete[0]}</span>」？</>
+              : <>确定删除选中的 <span className="font-medium tabular-nums">{pendingDelete.length}</span> 个域名？</>}
+            相关评分 / WHOIS / DNS / 观察记录将一并删除，不可恢复。
+          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={() => setPendingDelete(null)} className="btn-base btn-ghost !py-1 text-xs">取消</button>
+            <button type="button" onClick={doDelete} className="btn-base btn-danger !py-1 text-xs"><Trash2 className="h-3.5 w-3.5" />确认删除</button>
+          </div>
+        </div>
+      )}
+
+      {/* Batch action bar */}
+      {onDelete && !pendingDelete && selected.size > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <span>已选 <span className="font-medium tabular-nums text-foreground">{selected.size}</span> 个域名</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setSelected(new Set())} className="btn-base btn-ghost !py-1 text-xs">清除选择</button>
+            <button type="button" onClick={() => requestDelete([...selected])} className="btn-base btn-danger !py-1 text-xs"><Trash2 className="h-3.5 w-3.5" />删除选中</button>
+          </div>
+        </div>
+      )}
+
       {/* Desktop table */}
       <div className="card-elev hidden overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-sm">
             <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
+                {onDelete && <th className="w-10 px-3 py-2 text-center"><input type="checkbox" checked={allOnPage} onChange={toggleAll} aria-label="全选本页" className="cursor-pointer" /></th>}
                 <th className="cursor-pointer px-4 py-2 text-left font-medium" onClick={() => setSort("domain")}>域名{sortIcon("domain")}</th>
                 <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => setSort("score")}>评分{sortIcon("score")}</th>
                 <th className="px-3 py-2 text-left font-medium">状态</th>
@@ -354,7 +405,8 @@ export function DomainTable({
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-accent/40">
+                <tr key={r.id} className={`border-b border-border last:border-0 hover:bg-accent/40 ${selected.has(r.domain) ? "bg-primary/5" : ""}`}>
+                  {onDelete && <td className="px-3 py-2 text-center"><input type="checkbox" checked={selected.has(r.domain)} onChange={() => toggleOne(r.domain)} className="cursor-pointer" /></td>}
                   <td className="px-4 py-2">
                     <Link to="/domains/$domain" params={{ domain: r.domain }} className="font-medium text-foreground hover:text-primary">{r.domain}</Link>
                   </td>
@@ -374,6 +426,7 @@ export function DomainTable({
                       {onEnrich && <button type="button" onClick={() => onEnrich(r)} title="一键丰富 DNS/Archive/SEO" className="grid h-7 w-7 place-items-center rounded text-primary hover:bg-primary/10"><Sparkles className="h-3.5 w-3.5" /></button>}
                       {onWatch && <button type="button" onClick={() => onWatch(r)} title="观察" className="grid h-7 w-7 place-items-center rounded hover:bg-accent"><Eye className="h-3.5 w-3.5" /></button>}
                       <a href={`https://www.namecheap.com/domains/registration/results/?domain=${r.domain}`} target="_blank" rel="noreferrer" title="注册" className="grid h-7 w-7 place-items-center rounded text-primary hover:bg-accent"><ExternalLink className="h-3.5 w-3.5" /></a>
+                      {onDelete && <button type="button" onClick={() => requestDelete([r.domain])} title="删除域名" className="grid h-7 w-7 place-items-center rounded text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button>}
                     </div>
                   </td>
                 </tr>
@@ -388,7 +441,10 @@ export function DomainTable({
         {rows.map(r => (
           <div key={r.id} className="card-elev p-3">
             <div className="flex items-start justify-between gap-2">
-              <Link to="/domains/$domain" params={{ domain: r.domain }} className="min-w-0 truncate text-sm font-semibold text-foreground hover:text-primary">{r.domain}</Link>
+              <div className="flex min-w-0 items-center gap-2">
+                {onDelete && <input type="checkbox" checked={selected.has(r.domain)} onChange={() => toggleOne(r.domain)} className="shrink-0 cursor-pointer" aria-label="选择" />}
+                <Link to="/domains/$domain" params={{ domain: r.domain }} className="min-w-0 truncate text-sm font-semibold text-foreground hover:text-primary">{r.domain}</Link>
+              </div>
               <ScoreBadge score={r.score} />
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
@@ -408,6 +464,7 @@ export function DomainTable({
               {onWatch && <button type="button" onClick={() => onWatch(r)} className="btn-base btn-ghost flex-1 !py-1.5 text-xs">观察</button>}
               <Link to="/domains/$domain" params={{ domain: r.domain }} className="btn-base btn-ghost flex-1 !py-1.5 text-xs">详情</Link>
               <a href={`https://www.namecheap.com/domains/registration/results/?domain=${r.domain}`} target="_blank" rel="noreferrer" className="btn-base btn-primary flex-1 !py-1.5 text-xs">注册</a>
+              {onDelete && <button type="button" onClick={() => requestDelete([r.domain])} title="删除" className="btn-base btn-ghost !py-1.5 text-xs text-destructive"><Trash2 className="h-3 w-3" /></button>}
             </div>
           </div>
         ))}

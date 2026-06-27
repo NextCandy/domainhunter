@@ -84,6 +84,38 @@
 .dark {
   --background: oklch(0.17 0.012 250);
   --foreground: oklch(0.96 0.005 250);
+  --surface: oklch(0.205 0.015 250);
+  --surface-2: oklch(0.24 0.018 250);
+  --card: oklch(0.215 0.016 250);
+  --card-foreground: oklch(0.96 0.005 250);
+  --popover: oklch(0.215 0.016 250);
+  --popover-foreground: oklch(0.96 0.005 250);
+  --primary: oklch(0.64 0.19 264);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.265 0.018 250);
+  --secondary-foreground: oklch(0.94 0.006 250);
+  --muted: oklch(0.27 0.018 250);
+  --muted-foreground: oklch(0.72 0.025 250);
+  --accent: oklch(0.285 0.028 255);
+  --accent-foreground: oklch(0.96 0.005 250);
+  --destructive: oklch(0.66 0.19 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.68 0.16 145);
+  --success-foreground: oklch(0.12 0.018 145);
+  --warning: oklch(0.76 0.16 65);
+  --warning-foreground: oklch(0.16 0.03 65);
+  --border: oklch(0.32 0.018 250);
+  --border-strong: oklch(0.42 0.022 250);
+  --input: oklch(0.245 0.016 250);
+  --ring: oklch(0.64 0.19 264);
+  --sidebar: oklch(0.19 0.014 250);
+  --sidebar-foreground: oklch(0.96 0.005 250);
+  --sidebar-border: oklch(0.32 0.018 250);
+  --sidebar-accent: oklch(0.265 0.018 250);
+  --sidebar-accent-foreground: oklch(0.96 0.005 250);
+  --sidebar-primary: oklch(0.64 0.19 264);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-ring: oklch(0.64 0.19 264);
 }
 
 @layer base {
@@ -95,6 +127,9 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+  html {
+    view-transition-name: root;
   }
   ::selection {
     background: color-mix(in oklab, var(--primary) 25%, transparent);
@@ -124,6 +159,37 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+}
+
+@utility skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: color-mix(in oklab, var(--muted) 82%, var(--foreground) 8%);
+}
+@utility skeleton {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--surface) 60%, transparent), transparent);
+    animation: skeleton-shimmer 1.4s infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .domain-card-hover {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+  .domain-card-hover:hover {
+    transform: scale(1.02);
+    box-shadow: 0 12px 24px rgb(15 23 42 / 0.12);
+    border-color: var(--border-strong);
+  }
 }
 
 @utility btn-base {

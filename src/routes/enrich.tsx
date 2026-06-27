@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, Outlet, useMatchRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppShell, PageHeader, StatCard } from "@/components/app-shell";
@@ -6,7 +6,18 @@ import { listEnrichJobsFn, createEnrichJobFn, ENRICH_LIMITS } from "@/lib/enrich
 import { toast } from "sonner";
 import { Play, Plus } from "lucide-react";
 
-export const Route = createFileRoute("/enrich")({ component: EnrichListPage });
+export const Route = createFileRoute("/enrich")({ component: EnrichRoute });
+
+// enrich.tsx is the parent layout for the /enrich segment (parent of /enrich/$id).
+// It previously rendered the list directly with no <Outlet/>, so navigating to
+// /enrich/$id rendered the list and the detail child never mounted — and because
+// the job auto-advance loop lives in the detail page, enrich jobs were stuck
+// "pending" forever. Render the child via <Outlet/> on sub-routes, list otherwise.
+function EnrichRoute() {
+  const matchRoute = useMatchRoute();
+  if (matchRoute({ to: "/enrich/$id" })) return <Outlet />;
+  return <EnrichListPage />;
+}
 
 function EnrichListPage() {
   const qc = useQueryClient();

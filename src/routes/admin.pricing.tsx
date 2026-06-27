@@ -127,7 +127,7 @@ function AdminPricing() {
                 <tbody>
                   {(prices.data ?? []).map((p: any) => (
                     <tr key={p.id} className="border-t border-border/50">
-                      <td className="px-3 py-1.5">{p.registrars?.name ?? `#${p.registrar_id}`}</td>
+                      <td className="px-3 py-1.5">{p.registrar_name ?? `#${p.registrar_id}`}</td>
                       <td className="px-3 py-1.5 text-center">.{p.tld}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums">{p.register_price ?? "—"}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums">{p.renew_price ?? "—"}</td>
@@ -189,7 +189,7 @@ function AdminPricing() {
                 <tbody>
                   {(coupons.data ?? []).map((c: any) => (
                     <tr key={c.id} className="border-t border-border/50">
-                      <td className="px-3 py-1.5">{c.registrars?.name ?? `#${c.registrar_id}`}</td>
+                      <td className="px-3 py-1.5">{c.registrar_name ?? `#${c.registrar_id}`}</td>
                       <td className="px-3 py-1.5 font-mono">{c.code}</td>
                       <td className="px-3 py-1.5">{c.discount_type}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums">{c.discount_value}</td>

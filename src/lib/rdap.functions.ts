@@ -3,6 +3,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { pgShim } from "@/lib/pg-shim.server";
 
 /* ============================== LIMITS / VALIDATION ============================== */
 // Centralised bounds — also mirrored on the client (src/lib/limits.ts) so the
@@ -77,8 +78,8 @@ async function logEvent(
   } = {},
 ) {
   try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("job_events").insert({
+    const db = pgShim;
+    await db.from("job_events").insert({
       job_id: jobId,
       event,
       level: opts.level || "info",
@@ -108,8 +109,8 @@ const createJobSchema = z.object({
 export const createJobFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createJobSchema.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: job, error } = await supabaseAdmin
+    const db = pgShim;
+    const { data: job, error } = await db
       .from("jobs")
       .insert({
         name: data.name,
@@ -132,7 +133,7 @@ export const createJobFn = createServerFn({ method: "POST" })
     let inserted = 0;
     for (let i = 0; i < items.length; i += batchSize) {
       const slice = items.slice(i, i + batchSize);
-      const { error: err } = await supabaseAdmin.from("job_items").insert(slice);
+      const { error: err } = await db.from("job_items").insert(slice);
       if (err && !err.message.includes("duplicate")) {
         console.error("Insert items error:", err.message);
         await logEvent(jobId, "items_insert_error", {
@@ -176,10 +177,10 @@ const runBatchSchema = z.object({
 export const runJobBatchFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => runBatchSchema.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = pgShim;
     const { lookupDomain } = await import("./rdap.server");
 
-    const { data: job } = await supabaseAdmin
+    const { data: job } = await db
       .from("jobs")
       .select("status, started_at")
       .eq("id", data.jobId)
@@ -191,7 +192,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
 
     const wasRunning = (job as any).status === "running";
     const startedAt = (job as any).started_at ?? new Date().toISOString();
-    await supabaseAdmin
+    await db
       .from("jobs")
       .update({ status: "running", started_at: startedAt })
       .eq("id", data.jobId);
@@ -199,7 +200,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
       await logEvent(data.jobId, "started", { message: "任务开始执行" });
     }
 
-    const { data: items } = await supabaseAdmin
+    const { data: items } = await db
       .from("job_items")
       .select("id, domain")
       .eq("job_id", data.jobId)
@@ -208,7 +209,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
 
     const pendingItems = (items || []) as { id: number; domain: string }[];
     if (pendingItems.length === 0) {
-      await supabaseAdmin
+      await db
         .from("jobs")
         .update({ status: "completed", finished_at: new Date().toISOString() })
         .eq("id", data.jobId);
@@ -258,7 +259,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
       if (errMsg && errorSamples.length < 5) {
         errorSamples.push({ domain: it.domain, error: errMsg });
       }
-      const p = supabaseAdmin
+      const p = db
         .from("job_items")
         .update({
           status,
@@ -306,20 +307,20 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         });
       }
       if (upserts.length) {
-        await supabaseAdmin.from("domains").upsert(upserts, { onConflict: "domain" });
+        await db.from("domains").upsert(upserts, { onConflict: "domain" });
       }
     } catch (e: any) {
       await logEvent(data.jobId, "domains_upsert_failed", { level: "warning", message: String(e?.message ?? e) });
     }
 
-    const { data: cur } = await supabaseAdmin
+    const { data: cur } = await db
       .from("jobs")
       .select("checked, available, registered, unsupported, errors, total")
       .eq("id", data.jobId)
       .single();
     if (cur) {
       const c = cur as any;
-      await supabaseAdmin
+      await db
         .from("jobs")
         .update({
           checked: c.checked + pendingItems.length,
@@ -347,7 +348,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
       },
     });
 
-    const { count } = await supabaseAdmin
+    const { count } = await db
       .from("job_items")
       .select("id", { count: "exact", head: true })
       .eq("job_id", data.jobId)
@@ -355,7 +356,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
     const remaining = count || 0;
 
     if (remaining === 0) {
-      await supabaseAdmin
+      await db
         .from("jobs")
         .update({ status: "completed", finished_at: new Date().toISOString() })
         .eq("id", data.jobId);
@@ -376,8 +377,8 @@ const jobIdSchema = z.object({ jobId: z.string().uuid("无效的 jobId") });
 export const stopJobFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => jobIdSchema.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
+    const db = pgShim;
+    await db
       .from("jobs")
       .update({ status: "stopped", finished_at: new Date().toISOString() })
       .eq("id", data.jobId);
@@ -385,21 +386,32 @@ export const stopJobFn = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Delete a job entirely. job_items cascade via FK; job_events has no FK so it is
+// removed explicitly. enrich_jobs.source_job_id is ON DELETE SET NULL.
+export const deleteJobFn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => jobIdSchema.parse(data))
+  .handler(async ({ data }) => {
+    const db = pgShim;
+    await db.from("job_events").delete().eq("job_id", data.jobId);
+    await db.from("jobs").delete().eq("id", data.jobId);
+    return { ok: true };
+  });
+
 export const requeueErrorsFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => jobIdSchema.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { count: errCount } = await supabaseAdmin
+    const db = pgShim;
+    const { count: errCount } = await db
       .from("job_items")
       .select("id", { count: "exact", head: true })
       .eq("job_id", data.jobId)
       .eq("status", "error");
-    await supabaseAdmin
+    await db
       .from("job_items")
       .update({ status: "pending", error: null, info: null })
       .eq("job_id", data.jobId)
       .eq("status", "error");
-    const { data: cur } = await supabaseAdmin
+    const { data: cur } = await db
       .from("jobs")
       .select("checked, errors")
       .eq("id", data.jobId)
@@ -407,7 +419,7 @@ export const requeueErrorsFn = createServerFn({ method: "POST" })
     if (cur) {
       const c = cur as any;
       const n = errCount || 0;
-      await supabaseAdmin
+      await db
         .from("jobs")
         .update({
           checked: Math.max(0, c.checked - n),
@@ -428,14 +440,14 @@ const progressSchema = z.object({ jobId: z.string().uuid("无效的 jobId") });
 export const jobProgressFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => progressSchema.parse(d))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: job } = await supabaseAdmin
+    const db = pgShim;
+    const { data: job } = await db
       .from("jobs")
       .select("id,name,status,total,checked,available,registered,errors,unsupported,started_at,finished_at")
       .eq("id", data.jobId)
       .maybeSingle();
     if (!job) throw new Error("任务不存在");
-    const { data: errs } = await supabaseAdmin
+    const { data: errs } = await db
       .from("job_items")
       .select("domain,error,checked_at")
       .eq("job_id", data.jobId)
@@ -456,8 +468,8 @@ const recentSchema = z.object({
 export const recentItemsFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => recentSchema.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows } = await supabaseAdmin
+    const db = pgShim;
+    const { data: rows } = await db
       .from("job_items")
       .select("domain, error, checked_at")
       .eq("job_id", data.jobId)
@@ -468,8 +480,8 @@ export const recentItemsFn = createServerFn({ method: "POST" })
   });
 
 export const listRecentJobsFn = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data } = await supabaseAdmin
+  const db = pgShim;
+  const { data } = await db
     .from("jobs")
     .select("id, name, status, total, checked, available, registered, unsupported, errors, created_at")
     .order("created_at", { ascending: false })
@@ -480,8 +492,8 @@ export const listRecentJobsFn = createServerFn({ method: "GET" }).handler(async 
 export const getJobFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => jobIdSchema.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: job } = await supabaseAdmin
+    const db = pgShim;
+    const { data: job } = await db
       .from("jobs")
       .select("*")
       .eq("id", data.jobId)
@@ -510,8 +522,8 @@ export interface JobEvent {
 export const listJobEventsFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => listEventsSchema.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    let q = supabaseAdmin
+    const db = pgShim;
+    let q = db
       .from("job_events")
       .select("id, job_id, level, event, message, meta, created_at")
       .eq("job_id", data.jobId)
@@ -530,8 +542,8 @@ const errorReportSchema = z.object({
 export const jobErrorReportFn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => errorReportSchema.parse(data))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows } = await supabaseAdmin
+    const db = pgShim;
+    const { data: rows } = await db
       .from("job_items")
       .select("domain, tld, error, checked_at")
       .eq("job_id", data.jobId)

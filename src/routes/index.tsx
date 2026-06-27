@@ -2,8 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Search, Upload, Sparkles, Zap } from "lucide-react";
+import { LineChart, Line, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppShell, PageHeader, StatCard, ScoreBadge, StatusBadge } from "@/components/app-shell";
-import { overviewStatsFn, refreshDomainFn } from "@/lib/discover.functions";
+import { CardSkeleton, Skeleton } from "@/components/skeleton";
+import { overviewStatsFn, overviewTrendFn, refreshDomainFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -14,6 +16,10 @@ function HomePage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["overview-stats"],
     queryFn: () => overviewStatsFn(),
+  });
+  const trend = useQuery({
+    queryKey: ["overview-trend"],
+    queryFn: () => overviewTrendFn(),
   });
   const [q, setQ] = useState("");
   const [checking, setChecking] = useState(false);
@@ -61,12 +67,53 @@ function HomePage() {
       </form>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="今日新增" value={isLoading ? "—" : (data?.todayNew ?? 0).toLocaleString()} hint="过去 24 小时入库" />
-        <StatCard label="可注册" value={isLoading ? "—" : (data?.available ?? 0).toLocaleString()} tone="success" />
-        <StatCard label="待删除" value={isLoading ? "—" : (data?.pending ?? 0).toLocaleString()} tone="warning" />
-        <StatCard label="高分 (≥70)" value={isLoading ? "—" : (data?.highScore ?? 0).toLocaleString()} tone="primary" />
-        <StatCard label="观察中" value={isLoading ? "—" : (data?.watching ?? 0).toLocaleString()} />
+        {isLoading ? (
+          Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} lines={2} />)
+        ) : (
+          <>
+            <StatCard label="今日新增" value={(data?.todayNew ?? 0).toLocaleString()} hint="过去 24 小时入库" />
+            <StatCard label="可注册" value={(data?.available ?? 0).toLocaleString()} tone="success" />
+            <StatCard label="待删除" value={(data?.pending ?? 0).toLocaleString()} tone="warning" />
+            <StatCard label="高分 (≥70)" value={(data?.highScore ?? 0).toLocaleString()} tone="primary" />
+            <StatCard label="观察中" value={(data?.watching ?? 0).toLocaleString()} />
+          </>
+        )}
       </div>
+
+      <section className="card-elev mb-6 p-4 sm:p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold">7 天趋势</h2>
+            <p className="mt-1 text-xs text-muted-foreground">按域名入库时间聚合新增、可注册与高分域名</p>
+          </div>
+        </div>
+        {trend.isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-52 w-full" />
+          </div>
+        ) : (
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trend.data ?? []} margin={{ top: 8, right: 12, bottom: 0, left: -20 }}>
+                <CartesianGrid stroke="var(--border)" strokeDasharray="4 4" />
+                <XAxis dataKey="day" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis stroke="var(--muted-foreground)" tickLine={false} axisLine={false} fontSize={12} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "8px",
+                    color: "var(--popover-foreground)",
+                  }}
+                />
+                <Line type="monotone" dataKey="todayNew" name="今日新增" stroke="var(--primary)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="available" name="可注册" stroke="var(--success)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="highScore" name="高分域名" stroke="var(--warning)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
 
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -75,7 +122,9 @@ function HomePage() {
         </div>
 
         {isLoading ? (
-          <div className="card-elev p-8 text-center text-sm text-muted-foreground">加载中…</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => <CardSkeleton key={i} lines={3} />)}
+          </div>
         ) : (data?.featured?.length ?? 0) === 0 ? (
           <div className="card-elev p-8 text-center text-sm text-muted-foreground">
             还没有域名数据。<Link to="/admin/sources" className="text-primary hover:underline">从这里导入 TXT/CSV</Link> 开始。
@@ -83,7 +132,7 @@ function HomePage() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {(data?.featured ?? []).map((d: any) => (
-              <Link key={d.id} to="/domains/$domain" params={{ domain: d.domain }} className="card-elev block p-4 transition-shadow hover:shadow-md">
+              <Link key={d.id} to="/domains/$domain" params={{ domain: d.domain }} className="card-elev domain-card-hover block p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate font-semibold text-foreground">{d.domain}</div>

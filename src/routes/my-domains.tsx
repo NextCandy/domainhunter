@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { AppShell, PageHeader, EmptyState } from "@/components/app-shell";
+import { CardSkeleton } from "@/components/skeleton";
 import { listMyDomainsFn, upsertMyDomainFn, removeMyDomainFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
@@ -46,7 +47,9 @@ function MyDomainsPage() {
       </form>
 
       {isLoading ? (
-        <div className="card-elev p-8 text-center text-sm text-muted-foreground">加载中…</div>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} lines={2} />)}
+        </div>
       ) : !data?.length ? (
         <EmptyState title="还没有添加任何已购域名" hint="使用上方表单添加。" />
       ) : (
