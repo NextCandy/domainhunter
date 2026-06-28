@@ -32,6 +32,23 @@ function MyDomainsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["my-domains"] }),
   });
 
+  // ── Client-side sorting ──
+  const [sort, setSort] = useState<{ by: string; dir: "asc" | "desc" }>({ by: "expiry_date", dir: "asc" });
+  const toggleSort = (by: string) => setSort(s => s.by === by ? { by, dir: s.dir === "asc" ? "desc" : "asc" } : { by, dir: "asc" });
+  const sortIcon = (by: string) => sort.by === by ? (sort.dir === "asc" ? " ↑" : " ↓") : "";
+  const isDate = (by: string) => by === "registration_date" || by === "expiry_date";
+  const sorted = [...(data ?? [])].sort((a: any, b: any) => {
+    const av = a?.[sort.by] ?? null, bv = b?.[sort.by] ?? null;
+    let r: number;
+    if (av == null && bv == null) r = 0;
+    else if (av == null) r = 1;
+    else if (bv == null) r = -1;
+    else if (isDate(sort.by)) r = new Date(av).getTime() - new Date(bv).getTime();
+    else r = String(av).localeCompare(String(bv), "zh");
+    return sort.dir === "asc" ? r : -r;
+  });
+  const fmtDate = (s?: string | null) => { if (!s) return "—"; try { return new Date(s).toISOString().slice(0, 10); } catch { return "—"; } };
+
   return (
     <AppShell>
       <PageHeader title="我的域名" description="管理已购买的域名，到期前可手动提醒。" />
@@ -67,34 +84,71 @@ function MyDomainsPage() {
       ) : !data?.length ? (
         <EmptyState title="还没有添加任何已购域名" hint="使用上方表单添加。" />
       ) : (
-        <div className="card-elev overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">域名</th>
-                  <th className="px-3 py-2 text-left font-medium">注册商</th>
-                  <th className="px-3 py-2 text-left font-medium">到期时间</th>
-                  <th className="px-3 py-2 text-left font-medium">标签</th>
-                  <th className="px-3 py-2 text-left font-medium">备注</th>
-                  <th className="px-4 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((d: any) => (
-                  <tr key={d.id} className="border-b border-border last:border-0 hover:bg-accent/40">
-                    <td className="px-4 py-2 font-medium">{d.domain}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{d.registrar ?? "—"}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{d.expiry_date ? new Date(d.expiry_date).toISOString().slice(0,10) : "—"}</td>
-                    <td className="px-3 py-2"><div className="flex flex-wrap gap-1">{(d.tags ?? []).map((t: string) => <span key={t} className="chip">{t}</span>)}</div></td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{d.note ?? "—"}</td>
-                    <td className="px-4 py-2 text-right"><button onClick={() => delMut.mutate(d.id)} className="grid h-7 w-7 place-items-center rounded text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button></td>
+        <>
+          {/* Desktop table */}
+          <div className="card-elev hidden overflow-hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="cursor-pointer px-4 py-2 text-left font-medium" onClick={() => toggleSort("domain")}>域名{sortIcon("domain")}</th>
+                    <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => toggleSort("registrar")}>注册商{sortIcon("registrar")}</th>
+                    <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => toggleSort("registration_date")}>注册日期{sortIcon("registration_date")}</th>
+                    <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => toggleSort("expiry_date")}>到期日期{sortIcon("expiry_date")}</th>
+                    <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => toggleSort("dns_status")}>DNS{sortIcon("dns_status")}</th>
+                    <th className="px-3 py-2 text-left font-medium">标签</th>
+                    <th className="px-3 py-2 text-left font-medium">备注</th>
+                    <th className="px-4 py-2"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sorted.map((d: any) => (
+                    <tr key={d.id} className="border-b border-border last:border-0 hover:bg-accent/40">
+                      <td className="px-4 py-2 font-medium">{d.domain}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{d.registrar ?? "—"}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{fmtDate(d.registration_date)}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{fmtDate(d.expiry_date)}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{d.dns_status ?? "—"}</td>
+                      <td className="px-3 py-2"><div className="flex flex-wrap gap-1">{(d.tags ?? []).map((t: string) => <span key={t} className="chip">{t}</span>)}</div></td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{d.note ?? "—"}</td>
+                      <td className="px-4 py-2 text-right"><button onClick={() => delMut.mutate(d.id)} className="grid h-7 w-7 place-items-center rounded text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile cards */}
+          <div className="space-y-2 md:hidden">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <span>排序：</span>
+              {[["expiry_date", "到期"], ["registration_date", "注册"], ["domain", "域名"], ["registrar", "注册商"]].map(([by, lbl]) => (
+                <button key={by} onClick={() => toggleSort(by)} className={`rounded-md border px-2 py-0.5 ${sort.by === by ? "border-primary bg-primary/10 text-primary" : "border-border"}`}>{lbl}{sortIcon(by)}</button>
+              ))}
+            </div>
+            {sorted.map((d: any) => (
+              <div key={d.id} className="card-elev p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 truncate text-sm font-semibold">{d.domain}</span>
+                  <button onClick={() => delMut.mutate(d.id)} className="shrink-0 grid h-6 w-6 place-items-center rounded text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+                <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>注册商：{d.registrar ?? "—"}</span>
+                  <span>DNS：{d.dns_status ?? "—"}</span>
+                  <span>注册：{fmtDate(d.registration_date)}</span>
+                  <span>到期：{fmtDate(d.expiry_date)}</span>
+                </div>
+                {(d.tags?.length || d.note) && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    {(d.tags ?? []).map((t: string) => <span key={t} className="chip">{t}</span>)}
+                    {d.note && <span className="text-xs text-muted-foreground">{d.note}</span>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </AppShell>
   );

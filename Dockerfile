@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ---------- builder ----------
-FROM oven/bun:1.1-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
 # Build target: node-server (Nitro) so the output runs on plain Node on Synology
@@ -12,7 +12,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN bun run build
+RUN bun ./node_modules/vite/bin/vite.js build
 
 # ---------- runtime ----------
 FROM node:20-alpine AS runtime

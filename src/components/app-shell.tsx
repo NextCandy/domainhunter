@@ -208,6 +208,8 @@ export function StatusBadge({ status }: { status: string }) {
     available: { label: "可注册", cls: "bg-success/15 text-success" },
     registered: { label: "已注册", cls: "bg-muted text-muted-foreground" },
     pending_delete: { label: "待删除", cls: "bg-warning/15 text-warning" },
+    grace: { label: "宽限期", cls: "bg-warning/10 text-warning" },
+    redemption: { label: "赎回期", cls: "bg-warning/20 text-warning" },
     deleted: { label: "已删除", cls: "bg-destructive/10 text-destructive" },
     auction: { label: "拍卖中", cls: "bg-primary/10 text-primary" },
     unsupported: { label: "不支持", cls: "bg-muted text-muted-foreground" },

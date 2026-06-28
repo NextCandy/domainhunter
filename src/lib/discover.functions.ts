@@ -131,7 +131,11 @@ const DiscoverFilters = z.object({
   dropBefore: z.string().optional(),
   page: z.number().int().min(1).max(1000).default(1),
   pageSize: z.number().int().min(10).max(200).default(50),
-  sortBy: z.enum(["score", "domain", "length", "drop_date", "created_at"]).default("score"),
+  sortBy: z.enum([
+    "score", "domain", "length", "drop_date", "created_at",
+    "status", "type", "risk_level", "expiry_date",
+    "backlinks", "referring_domains", "archive_year", "tld_registered_count",
+  ]).default("score"),
   sortDir: z.enum(["asc", "desc"]).default("desc"),
 });
 export type DiscoverFilters = z.infer<typeof DiscoverFilters>;
@@ -139,40 +143,53 @@ export type DiscoverFilters = z.infer<typeof DiscoverFilters>;
 export const discoverFn = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => DiscoverFilters.parse(d))
   .handler(async ({ data }) => {
-    const sb = sbAdmin();
     const from = (data.page - 1) * data.pageSize;
-    const to = from + data.pageSize - 1;
-    let q = sb.from("domains").select("*", { count: "exact" });
-    if (data.q) q = q.ilike("domain", `%${data.q}%`);
-    if (data.tlds?.length) q = q.in("tld", data.tlds);
-    if (data.statuses?.length) q = q.in("status", data.statuses);
-    if (data.types?.length) q = q.in("type", data.types);
-    if (data.riskLevels?.length) q = q.in("risk_level", data.riskLevels);
-    if (data.minLength != null) q = q.gte("length", data.minLength);
-    if (data.maxLength != null) q = q.lte("length", data.maxLength);
-    if (data.minScore != null) q = q.gte("score", data.minScore);
-    if (data.startsWith) q = q.ilike("name", `${data.startsWith}%`);
-    if (data.endsWith) q = q.ilike("name", `%${data.endsWith}`);
-    if (data.contains) q = q.ilike("name", `%${data.contains}%`);
-    if (data.dropBefore) q = q.lte("drop_date", data.dropBefore);
-    q = q.order(data.sortBy, { ascending: data.sortDir === "asc" }).range(from, to);
-    const { data: rows, count, error } = await q;
-    if (error) throw new Error(error.message);
-    // Manual join: fetch metrics for the visible rows.
-    const ids = (rows ?? []).map((r: any) => r.id).filter(Boolean);
-    let metricsByDomain = new Map<string, any>();
-    if (ids.length) {
-      const { data: metrics } = await sb.from("domain_metrics").select("*").in("domain_id", ids);
-      for (const m of (metrics as any[]) ?? []) metricsByDomain.set(m.domain_id, m);
-    }
-    let filtered = (rows ?? []).map((r: any) => ({ ...r, metrics: metricsByDomain.get(r.id) ?? null }));
-    if (data.regex) {
-      try { const re = new RegExp(data.regex, "i"); filtered = filtered.filter((r: any) => re.test(r.name)); }
-      catch {}
-    }
-    if (data.archiveYearMin != null) filtered = filtered.filter((r: any) => (r.metrics?.archive_year ?? 0) >= data.archiveYearMin!);
-    if (data.backlinksMin != null) filtered = filtered.filter((r: any) => (r.metrics?.backlinks ?? 0) >= data.backlinksMin!);
-    return { rows: filtered, total: count ?? 0 };
+    // Sortable columns → SQL expression. d = domains, m = domain_metrics (LEFT JOIN).
+    const SORT: Record<string, string> = {
+      score: "d.score", domain: "d.domain", length: "d.length",
+      drop_date: "d.drop_date", created_at: "d.created_at", status: "d.status",
+      type: "d.type", risk_level: "d.risk_level", expiry_date: "d.expiry_date",
+      backlinks: "m.backlinks", referring_domains: "m.referring_domains",
+      archive_year: "m.archive_year", tld_registered_count: "m.tld_registered_count",
+    };
+    const sortCol = SORT[data.sortBy] ?? "d.score";
+    const dir = data.sortDir === "asc" ? "ASC" : "DESC";
+
+    const where: string[] = [];
+    const params: unknown[] = [];
+    let i = 1;
+    if (data.q) { where.push(`d.domain ILIKE $${i++}`); params.push(`%${data.q}%`); }
+    if (data.tlds?.length) { where.push(`d.tld = ANY($${i++})`); params.push(data.tlds); }
+    if (data.statuses?.length) { where.push(`d.status = ANY($${i++})`); params.push(data.statuses); }
+    if (data.types?.length) { where.push(`d.type = ANY($${i++})`); params.push(data.types); }
+    if (data.riskLevels?.length) { where.push(`d.risk_level = ANY($${i++})`); params.push(data.riskLevels); }
+    if (data.minLength != null) { where.push(`d.length >= $${i++}`); params.push(data.minLength); }
+    if (data.maxLength != null) { where.push(`d.length <= $${i++}`); params.push(data.maxLength); }
+    if (data.minScore != null) { where.push(`d.score >= $${i++}`); params.push(data.minScore); }
+    if (data.startsWith) { where.push(`d.name ILIKE $${i++}`); params.push(`${data.startsWith}%`); }
+    if (data.endsWith) { where.push(`d.name ILIKE $${i++}`); params.push(`%${data.endsWith}`); }
+    if (data.contains) { where.push(`d.name ILIKE $${i++}`); params.push(`%${data.contains}%`); }
+    if (data.dropBefore) { where.push(`d.drop_date <= $${i++}`); params.push(data.dropBefore); }
+    if (data.archiveYearMin != null) { where.push(`COALESCE(m.archive_year,0) >= $${i++}`); params.push(data.archiveYearMin); }
+    if (data.backlinksMin != null) { where.push(`COALESCE(m.backlinks,0) >= $${i++}`); params.push(data.backlinksMin); }
+    if (data.regex) { try { new RegExp(data.regex); where.push(`d.name ~* $${i++}`); params.push(data.regex); } catch { /* invalid regex ignored */ } }
+    const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
+
+    const cnt = await query<{ c: number }>(
+      `SELECT COUNT(*)::int AS c FROM public.domains d LEFT JOIN public.domain_metrics m ON m.domain_id = d.id ${whereSql}`,
+      params,
+    );
+    const total = cnt.rows[0]?.c ?? 0;
+    const rows = await query(
+      `SELECT d.*, to_jsonb(m) AS metrics
+         FROM public.domains d
+         LEFT JOIN public.domain_metrics m ON m.domain_id = d.id
+         ${whereSql}
+         ORDER BY ${sortCol} ${dir} NULLS LAST, d.id ${dir}
+         LIMIT ${Number(data.pageSize)} OFFSET ${Number(from)}`,
+      params,
+    );
+    return { rows: rows.rows, total };
   });
 
 // ───────── Delete domains (single + batch) ─────────
@@ -260,7 +277,7 @@ export const importMyDomainsFn = createServerFn({ method: "POST" })
 // Currently implements Spaceship (X-API-Key/X-API-Secret, paginated GET /v1/domains).
 async function fetchSpaceshipDomains(apiKey: string, apiSecret: string) {
   const headers = { "X-API-Key": apiKey, "X-API-Secret": apiSecret, "Content-Type": "application/json" };
-  const out: { domain: string; registrar: string; expiry_date: string | null }[] = [];
+  const out: { domain: string; registrar: string; expiry_date: string | null; registration_date: string | null }[] = [];
   const take = 100;
   let skip = 0;
   let total = Infinity;
@@ -276,7 +293,7 @@ async function fetchSpaceshipDomains(apiKey: string, apiSecret: string) {
     total = j.total ?? 0;
     const items = j.items ?? [];
     for (const it of items) {
-      if (it?.name) out.push({ domain: String(it.name).toLowerCase(), registrar: "Spaceship", expiry_date: it.expirationDate ?? null });
+      if (it?.name) out.push({ domain: String(it.name).toLowerCase(), registrar: "Spaceship", expiry_date: it.expirationDate ?? null, registration_date: it.registrationDate ?? null });
     }
     if (!items.length) break;
     skip += take;
@@ -302,7 +319,7 @@ export const importMyDomainsFromApiFn = createServerFn({ method: "POST" })
     const { data: before } = await sb.from("my_domains").select("domain").in("domain", names);
     const existing = new Set(((before as any[]) ?? []).map(r => r.domain));
     const rows = list.filter(d => !existing.has(d.domain))
-      .map(d => ({ domain: d.domain, registrar: d.registrar, expiry_date: d.expiry_date }));
+      .map(d => ({ domain: d.domain, registrar: d.registrar, expiry_date: d.expiry_date, registration_date: d.registration_date }));
     if (rows.length) await sb.from("my_domains").upsert(rows, { onConflict: "domain", ignoreDuplicates: true });
     return { added: rows.length, exists: existing.size, total: list.length };
   });

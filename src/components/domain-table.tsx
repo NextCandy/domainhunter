@@ -391,15 +391,15 @@ export function DomainTable({
                 {onDelete && <th className="w-10 px-3 py-2 text-center"><input type="checkbox" checked={allOnPage} onChange={toggleAll} aria-label="全选本页" className="cursor-pointer" /></th>}
                 <th className="cursor-pointer px-4 py-2 text-left font-medium" onClick={() => setSort("domain")}>域名{sortIcon("domain")}</th>
                 <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => setSort("score")}>评分{sortIcon("score")}</th>
-                <th className="px-3 py-2 text-left font-medium">状态</th>
+                <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => setSort("status")}>状态{sortIcon("status")}</th>
                 <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => setSort("length")}>长度{sortIcon("length")}</th>
-                <th className="px-3 py-2 text-left font-medium">类型</th>
-                <th className="px-3 py-2 text-right font-medium">BL</th>
-                <th className="px-3 py-2 text-right font-medium">DP</th>
-                <th className="px-3 py-2 text-right font-medium">ABY</th>
-                <th className="px-3 py-2 text-right font-medium">Reg</th>
+                <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => setSort("type")}>类型{sortIcon("type")}</th>
+                <th className="cursor-pointer px-3 py-2 text-right font-medium" onClick={() => setSort("backlinks")}>BL{sortIcon("backlinks")}</th>
+                <th className="cursor-pointer px-3 py-2 text-right font-medium" onClick={() => setSort("referring_domains")}>DP{sortIcon("referring_domains")}</th>
+                <th className="cursor-pointer px-3 py-2 text-right font-medium" onClick={() => setSort("archive_year")}>ABY{sortIcon("archive_year")}</th>
+                <th className="cursor-pointer px-3 py-2 text-right font-medium" onClick={() => setSort("tld_registered_count")}>Reg{sortIcon("tld_registered_count")}</th>
                 <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => setSort("drop_date")}>到期/删除{sortIcon("drop_date")}</th>
-                <th className="px-3 py-2 text-left font-medium">风险</th>
+                <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => setSort("risk_level")}>风险{sortIcon("risk_level")}</th>
                 <th className="px-4 py-2 text-right font-medium">操作</th>
               </tr>
             </thead>
@@ -438,6 +438,12 @@ export function DomainTable({
 
       {/* Mobile cards */}
       <div className="space-y-2 md:hidden">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <span>排序：</span>
+          {([["score", "评分"], ["status", "状态"], ["length", "长度"], ["type", "类型"], ["drop_date", "到期"], ["backlinks", "BL"]] as const).map(([by, lbl]) => (
+            <button key={by} type="button" onClick={() => setSort(by)} className={`rounded-md border px-2 py-0.5 ${filters.sortBy === by ? "border-primary bg-primary/10 text-primary" : "border-border"}`}>{lbl}{sortIcon(by)}</button>
+          ))}
+        </div>
         {rows.map(r => (
           <div key={r.id} className="card-elev p-3">
             <div className="flex items-start justify-between gap-2">

@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS public.my_domains (
   id bigserial PRIMARY KEY,
   domain text NOT NULL UNIQUE,
   registrar text,
+  registration_date timestamptz,
   expiry_date timestamptz,
   dns_status text,
   renew_reminder boolean NOT NULL DEFAULT true,
