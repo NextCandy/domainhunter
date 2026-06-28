@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { AppShell, PageHeader, EmptyState } from "@/components/app-shell";
 import { CardSkeleton } from "@/components/skeleton";
-import { listMyDomainsFn, upsertMyDomainFn, removeMyDomainFn } from "@/lib/discover.functions";
+import { ImportPanel } from "@/components/import-panel";
+import { ApiImportPanel } from "@/components/api-import-panel";
+import { listMyDomainsFn, upsertMyDomainFn, removeMyDomainFn, importMyDomainsFn, importMyDomainsFromApiFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/my-domains")({
@@ -33,6 +35,18 @@ function MyDomainsPage() {
   return (
     <AppShell>
       <PageHeader title="我的域名" description="管理已购买的域名，到期前可手动提醒。" />
+
+      <div className="mb-4 flex flex-wrap items-start gap-2">
+        <ImportPanel
+          title="批量导入到我的域名"
+          onImport={(text) => importMyDomainsFn({ data: { text } })}
+          onDone={() => qc.invalidateQueries({ queryKey: ["my-domains"] })}
+        />
+        <ApiImportPanel
+          onImport={(args) => importMyDomainsFromApiFn({ data: args })}
+          onDone={() => qc.invalidateQueries({ queryKey: ["my-domains"] })}
+        />
+      </div>
 
       <form
         onSubmit={e => { e.preventDefault(); if (!form.domain) return; addMut.mutate(form); }}

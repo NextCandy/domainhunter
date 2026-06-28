@@ -12,7 +12,7 @@ function sbAdmin() {
   return pgShim;
 }
 
-const TLD_SAFE = /^[a-z0-9-]+$/i;
+const TLD_SAFE = /^[a-z0-9.-]+$/i; // allow dotted ccTLDs like com.cn / org.cn
 
 async function ensureAdminUser() {
   const [{ getRequest }, { hasRole, verifyToken }] = await Promise.all([
@@ -191,6 +191,122 @@ export const deleteDomainsFn = createServerFn({ method: "POST" })
     return { deleted: list.length };
   });
 
+// ───────── Batch import → watchlist / my-domains (file or paste) ─────────
+// Accepts free text: one domain per line, or comma/space/semicolon separated.
+// Non-domain tokens are counted as invalid and skipped. Existing rows are never
+// overwritten (ON CONFLICT DO NOTHING).
+function parseDomainList(text: string): string[] {
+  return Array.from(new Set(
+    text.split(/[\s,;]+/).map(s => s.trim().toLowerCase()).filter(Boolean),
+  ));
+}
+
+export const importWatchlistFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ text: z.string().min(1).max(2_000_000) }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = sbAdmin();
+    const weights = await getWeights();
+    const tokens = parseDomainList(data.text);
+    const rows: Record<string, unknown>[] = [];
+    let invalid = 0;
+    for (const t of tokens) {
+      const parsed = parseDomain(t);
+      if (!parsed) { invalid++; continue; }
+      const sc = scoreDomain({ name: parsed.name, tld: parsed.tld }, weights);
+      rows.push({
+        domain: parsed.domain, name: parsed.name, tld: parsed.tld,
+        length: parsed.name.length, type: classifyDomain(parsed.name), score: sc.total,
+      });
+    }
+    if (!rows.length) return { added: 0, exists: 0, invalid, total: tokens.length };
+    const domains = rows.map(r => r.domain as string);
+    await sb.from("domains").upsert(rows, { onConflict: "domain", ignoreDuplicates: true });
+    const { data: doms, error } = await sb.from("domains").select("id, domain").in("domain", domains);
+    if (error) throw new Error(error.message);
+    const ids = ((doms as any[]) ?? []).map(d => d.id);
+    const { data: already } = await sb.from("watchlist").select("domain_id").in("domain_id", ids);
+    const watched = new Set(((already as any[]) ?? []).map(w => w.domain_id));
+    const toAdd = ids.filter(id => !watched.has(id)).map(id => ({ domain_id: id }));
+    if (toAdd.length) {
+      const { error: e2 } = await sb.from("watchlist").insert(toAdd);
+      if (e2) throw new Error(e2.message);
+    }
+    return { added: toAdd.length, exists: ids.length - toAdd.length, invalid, total: tokens.length };
+  });
+
+export const importMyDomainsFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ text: z.string().min(1).max(2_000_000) }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = sbAdmin();
+    const tokens = parseDomainList(data.text);
+    const rows: Record<string, unknown>[] = [];
+    let invalid = 0;
+    for (const t of tokens) {
+      const parsed = parseDomain(t);
+      if (!parsed) { invalid++; continue; }
+      rows.push({ domain: parsed.domain });
+    }
+    if (!rows.length) return { added: 0, exists: 0, invalid, total: tokens.length };
+    const domains = rows.map(r => r.domain as string);
+    const { data: before } = await sb.from("my_domains").select("domain").in("domain", domains);
+    const existing = new Set(((before as any[]) ?? []).map(r => r.domain));
+    await sb.from("my_domains").upsert(rows, { onConflict: "domain", ignoreDuplicates: true });
+    const added = domains.filter(d => !existing.has(d)).length;
+    return { added, exists: domains.length - added, invalid, total: tokens.length };
+  });
+
+// ───────── Import → my-domains via registrar API ─────────
+// Pulls the domains the user owns at a registrar and adds them to my_domains.
+// Currently implements Spaceship (X-API-Key/X-API-Secret, paginated GET /v1/domains).
+async function fetchSpaceshipDomains(apiKey: string, apiSecret: string) {
+  const headers = { "X-API-Key": apiKey, "X-API-Secret": apiSecret, "Content-Type": "application/json" };
+  const out: { domain: string; registrar: string; expiry_date: string | null }[] = [];
+  const take = 100;
+  let skip = 0;
+  let total = Infinity;
+  while (skip < total && skip < 100_000) {
+    const res = await fetch(`https://spaceship.dev/api/v1/domains?take=${take}&skip=${skip}`, {
+      headers, signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`Spaceship API ${res.status}${t ? `：${t.slice(0, 200)}` : ""}`);
+    }
+    const j = await res.json() as { items?: any[]; total?: number };
+    total = j.total ?? 0;
+    const items = j.items ?? [];
+    for (const it of items) {
+      if (it?.name) out.push({ domain: String(it.name).toLowerCase(), registrar: "Spaceship", expiry_date: it.expirationDate ?? null });
+    }
+    if (!items.length) break;
+    skip += take;
+  }
+  return out;
+}
+
+export const importMyDomainsFromApiFn = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({
+    registrar: z.enum(["spaceship"]),
+    apiKey: z.string().min(1).max(500),
+    apiSecret: z.string().min(1).max(500),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = sbAdmin();
+    let fetched: { domain: string; registrar: string; expiry_date: string | null }[] = [];
+    if (data.registrar === "spaceship") {
+      fetched = await fetchSpaceshipDomains(data.apiKey, data.apiSecret);
+    }
+    const list = Array.from(new Map(fetched.map(d => [d.domain, d])).values());
+    if (!list.length) return { added: 0, exists: 0, total: 0 };
+    const names = list.map(d => d.domain);
+    const { data: before } = await sb.from("my_domains").select("domain").in("domain", names);
+    const existing = new Set(((before as any[]) ?? []).map(r => r.domain));
+    const rows = list.filter(d => !existing.has(d.domain))
+      .map(d => ({ domain: d.domain, registrar: d.registrar, expiry_date: d.expiry_date }));
+    if (rows.length) await sb.from("my_domains").upsert(rows, { onConflict: "domain", ignoreDuplicates: true });
+    return { added: rows.length, exists: existing.size, total: list.length };
+  });
+
 // ───────── Import (TXT / CSV) ─────────
 const ImportSchema = z.object({
   source: z.string().trim().max(80).default("manual"),
@@ -336,7 +452,7 @@ export const checkRelatedTldsFn = createServerFn({ method: "POST" })
 export const listWatchlistFn = createServerFn({ method: "GET" }).handler(async () => {
   const sb = sbAdmin();
   const { data, error } = await sb.from("watchlist")
-    .select("*").order("created_at", { ascending: false }).limit(500);
+    .select("*").order("created_at", { ascending: false }).limit(5000);
   if (error) throw new Error(error.message);
   const rows = (data as any[]) ?? [];
   const ids = rows.map((r) => r.domain_id).filter(Boolean);

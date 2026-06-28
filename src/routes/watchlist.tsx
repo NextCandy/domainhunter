@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { AppShell, PageHeader, EmptyState, ScoreBadge, StatusBadge } from "@/components/app-shell";
 import { CardSkeleton } from "@/components/skeleton";
-import { listWatchlistFn, updateWatchlistFn, removeWatchFn } from "@/lib/discover.functions";
+import { ImportPanel } from "@/components/import-panel";
+import { listWatchlistFn, updateWatchlistFn, removeWatchFn, importWatchlistFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/watchlist")({
@@ -42,6 +43,14 @@ function WatchlistPage() {
         title="观察列表"
         description={`共 ${(data?.length ?? 0).toLocaleString()} 个域名`}
       />
+
+      <div className="mb-4">
+        <ImportPanel
+          title="批量导入到观察列表"
+          onImport={(text) => importWatchlistFn({ data: { text } })}
+          onDone={() => qc.invalidateQueries({ queryKey: ["watchlist"] })}
+        />
+      </div>
 
       {allTags.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
