@@ -59,22 +59,49 @@ export const overviewStatsFn = createServerFn({ method: "GET" }).handler(async (
   const sb = sbAdmin();
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const since = today.toISOString();
-  const [todayNew, available, pending, highScore, watching] = await Promise.all([
+  const expiringBefore = new Date();
+  expiringBefore.setDate(expiringBefore.getDate() + 30);
+  const [totalDomains, todayNew, available, pending, highScore, watching, expiringSoon, recentChecked] = await Promise.all([
+    sb.from("domains").select("*", { count: "exact", head: true }),
     sb.from("domains").select("*", { count: "exact", head: true }).gte("created_at", since),
     sb.from("domains").select("*", { count: "exact", head: true }).eq("status", "available"),
     sb.from("domains").select("*", { count: "exact", head: true }).eq("status", "pending_delete"),
     sb.from("domains").select("*", { count: "exact", head: true }).gte("score", 70),
     sb.from("watchlist").select("*", { count: "exact", head: true }).eq("status", "watching"),
+    sb
+      .from("domains")
+      .select("*", { count: "exact", head: true })
+      .not("expiry_date", "is", null)
+      .gte("expiry_date", new Date().toISOString())
+      .lte("expiry_date", expiringBefore.toISOString()),
+    sb.from("domains").select("*", { count: "exact", head: true }).gte("last_checked_at", since),
   ]);
   const featured = await sb
     .from("domains").select("*").gte("score", 60).order("score", { ascending: false }).limit(12);
+  const recent = await query<{
+    domain: string;
+    status: string;
+    score: number;
+    source: string | null;
+    last_checked_at: string | null;
+  }>(
+    `SELECT domain, status, score, source, last_checked_at
+       FROM public.domains
+      WHERE last_checked_at IS NOT NULL
+      ORDER BY last_checked_at DESC
+      LIMIT 8`,
+  );
   return {
+    totalDomains: totalDomains.count ?? 0,
     todayNew: todayNew.count ?? 0,
     available: available.count ?? 0,
     pending: pending.count ?? 0,
     highScore: highScore.count ?? 0,
     watching: watching.count ?? 0,
+    expiringSoon: expiringSoon.count ?? 0,
+    recentChecked: recentChecked.count ?? 0,
     featured: featured.data ?? [],
+    recent: recent.rows,
   };
 });
 

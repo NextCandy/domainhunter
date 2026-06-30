@@ -38,6 +38,24 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+function withFreshHtmlHeaders(request: Request, response: Response): Response {
+  const url = new URL(request.url);
+  const isApi = url.pathname.startsWith("/api/") || url.pathname.includes("/_server");
+  const isAsset = url.pathname.startsWith("/assets/");
+  const contentType = response.headers.get("content-type") ?? "";
+  if (isApi || isAsset || !contentType.includes("text/html")) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  headers.set("Pragma", "no-cache");
+  headers.set("Expires", "0");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     startWatchlistScheduler();
@@ -54,8 +72,9 @@ export default {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       const normalized = await normalizeCatastrophicSsrResponse(response);
-      logRequest(request, normalized.status, Date.now() - startedAt, userId);
-      return normalized;
+      const finalResponse = withFreshHtmlHeaders(request, normalized);
+      logRequest(request, finalResponse.status, Date.now() - startedAt, userId);
+      return finalResponse;
     } catch (error) {
       console.error(error);
       logRequest(request, 500, Date.now() - startedAt, userId);

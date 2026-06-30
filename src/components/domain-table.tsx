@@ -465,12 +465,12 @@ export function DomainTable({
               <span>ABY {r.metrics?.archive_year ?? "—"}</span>
               <span>{formatDate(r.drop_date ?? r.expiry_date)}</span>
             </div>
-            <div className="mt-2 flex gap-2">
-              {onEnrich && <button type="button" onClick={() => onEnrich(r)} className="btn-base btn-ghost flex-1 !py-1.5 text-xs"><Sparkles className="h-3 w-3" />丰富</button>}
-              {onWatch && <button type="button" onClick={() => onWatch(r)} className="btn-base btn-ghost flex-1 !py-1.5 text-xs">观察</button>}
-              <Link to="/domains/$domain" params={{ domain: r.domain }} className="btn-base btn-ghost flex-1 !py-1.5 text-xs">详情</Link>
-              <a href={`https://www.namecheap.com/domains/registration/results/?domain=${r.domain}`} target="_blank" rel="noreferrer" className="btn-base btn-primary flex-1 !py-1.5 text-xs">注册</a>
-              {onDelete && <button type="button" onClick={() => requestDelete([r.domain])} title="删除" className="btn-base btn-ghost !py-1.5 text-xs text-destructive"><Trash2 className="h-3 w-3" /></button>}
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {onEnrich && <button type="button" onClick={() => onEnrich(r)} className="btn-base btn-ghost !py-1.5 text-xs"><Sparkles className="h-3 w-3" />丰富</button>}
+              {onWatch && <button type="button" onClick={() => onWatch(r)} className="btn-base btn-ghost !py-1.5 text-xs">观察</button>}
+              <Link to="/domains/$domain" params={{ domain: r.domain }} className="btn-base btn-ghost !py-1.5 text-xs">详情</Link>
+              <a href={`https://www.namecheap.com/domains/registration/results/?domain=${r.domain}`} target="_blank" rel="noreferrer" className="btn-base btn-primary !py-1.5 text-xs">注册</a>
+              {onDelete && <button type="button" onClick={() => requestDelete([r.domain])} title="删除" className="btn-base btn-ghost col-span-2 !py-1.5 text-xs text-destructive"><Trash2 className="h-3 w-3" />删除</button>}
             </div>
           </div>
         ))}
