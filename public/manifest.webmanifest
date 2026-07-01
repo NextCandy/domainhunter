@@ -1,0 +1,18 @@
+{
+  "name": "DomainHunter",
+  "short_name": "DHunter",
+  "description": "过期域名发现 / 评分 / 观察工具",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0A0F1E",
+  "theme_color": "#0A0F1E",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -78,11 +78,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "theme-color", content: "#0A0F1E" },
       { title: "DomainHunter — 过期域名发现 / 评分 / 观察工具" },
-      { name: "description", content: "DomainHunter 是一个自托管的过期域名发现、筛选、评分、观察与抢注辅助工具。支持高级筛选、规则化评分、批量 RDAP/WHOIS 检查与多注册商跳转。" },
+      {
+        name: "description",
+        content:
+          "DomainHunter 是一个自托管的过期域名发现、筛选、评分、观察与抢注辅助工具。支持高级筛选、规则化评分、批量 RDAP/WHOIS 检查与多注册商跳转。",
+      },
       { name: "author", content: "DomainHunter" },
       { property: "og:title", content: "DomainHunter — 过期域名发现工具" },
-      { property: "og:description", content: "高级筛选 + 规则化评分 + 实时 RDAP，发现高价值过期域名。" },
+      {
+        property: "og:description",
+        content: "高级筛选 + 规则化评分 + 实时 RDAP，发现高价值过期域名。",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "DomainHunter" },
@@ -93,6 +101,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,
@@ -103,7 +113,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="zh-CN" className="dark">
       <head>
         <HeadContent />
       </head>
@@ -121,7 +131,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      <Toaster theme="light" position="top-right" richColors closeButton />
+      <Toaster theme="dark" position="top-right" richColors closeButton />
     </QueryClientProvider>
   );
 }

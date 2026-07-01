@@ -28,7 +28,14 @@ export async function fetchSeo(domain: string): Promise<SeoSummary | null> {
     // Semrush returns CSV. Quick parse of first data line.
     const lines = text.trim().split("\n");
     if (lines.length < 2) {
-      return { rank: null, organic_traffic: 0, organic_keywords: 0, backlinks: null, referring_domains: null, authority_score: null };
+      return {
+        rank: null,
+        organic_traffic: 0,
+        organic_keywords: 0,
+        backlinks: null,
+        referring_domains: null,
+        authority_score: null,
+      };
     }
     const cols = lines[1].split(";");
     const num = (v: string | undefined) => {

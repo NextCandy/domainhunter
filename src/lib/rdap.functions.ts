@@ -3,7 +3,11 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { pgShim } from "@/lib/pg-shim.server";
+
+async function getDb() {
+  const { pgShim } = await import("@/lib/pg-shim.server");
+  return pgShim;
+}
 
 /* ============================== LIMITS / VALIDATION ============================== */
 // Centralised bounds — also mirrored on the client (src/lib/limits.ts) so the
@@ -38,7 +42,7 @@ const lookupSchema = z.object({
 });
 
 export const lookupDomainFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => lookupSchema.parse(data))
+  .validator((data: unknown) => lookupSchema.parse(data))
   .handler(async ({ data }) => {
     const { lookupDomain } = await import("./rdap.server");
     return lookupDomain(data.domain, { timeoutMs: data.timeoutMs });
@@ -50,7 +54,7 @@ const tldsSchema = z.object({
 });
 
 export const fetchTldsFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => tldsSchema.parse(data))
+  .validator((data: unknown) => tldsSchema.parse(data))
   .handler(async ({ data }) => {
     const rdapMod = await import("./rdap.server");
     if (data.source === "common") {
@@ -78,7 +82,7 @@ async function logEvent(
   } = {},
 ) {
   try {
-    const db = pgShim;
+    const db = await getDb();
     await db.from("job_events").insert({
       job_id: jobId,
       event,
@@ -103,13 +107,16 @@ const createJobSchema = z.object({
   domains: z
     .array(z.string().min(3, "域名过短").max(253, "域名过长"))
     .min(1, "候选域名为空")
-    .max(LIMITS.domainsPerJob.max, `单任务最多 ${LIMITS.domainsPerJob.max.toLocaleString()} 个域名`),
+    .max(
+      LIMITS.domainsPerJob.max,
+      `单任务最多 ${LIMITS.domainsPerJob.max.toLocaleString()} 个域名`,
+    ),
 });
 
 export const createJobFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => createJobSchema.parse(data))
+  .validator((data: unknown) => createJobSchema.parse(data))
   .handler(async ({ data }) => {
-    const db = pgShim;
+    const db = await getDb();
     const { data: job, error } = await db
       .from("jobs")
       .insert({
@@ -175,9 +182,9 @@ const runBatchSchema = z.object({
 });
 
 export const runJobBatchFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => runBatchSchema.parse(data))
+  .validator((data: unknown) => runBatchSchema.parse(data))
   .handler(async ({ data }) => {
-    const db = pgShim;
+    const db = await getDb();
     const { lookupDomain } = await import("./rdap.server");
 
     const { data: job } = await db
@@ -192,10 +199,7 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
 
     const wasRunning = (job as any).status === "running";
     const startedAt = (job as any).started_at ?? new Date().toISOString();
-    await db
-      .from("jobs")
-      .update({ status: "running", started_at: startedAt })
-      .eq("id", data.jobId);
+    await db.from("jobs").update({ status: "running", started_at: startedAt }).eq("id", data.jobId);
     if (!wasRunning) {
       await logEvent(data.jobId, "started", { message: "任务开始执行" });
     }
@@ -218,7 +222,10 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         const { maybeAutoEnrich } = await import("./enrich-jobs.functions");
         await maybeAutoEnrich(data.jobId);
       } catch (e: any) {
-        await logEvent(data.jobId, "auto_enrich_failed", { level: "warning", message: String(e?.message ?? e) });
+        await logEvent(data.jobId, "auto_enrich_failed", {
+          level: "warning",
+          message: String(e?.message ?? e),
+        });
       }
       return { processed: 0, remaining: 0, stopped: false };
     }
@@ -239,7 +246,9 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
     for (let i = 0; i < pendingItems.length; i++) {
       const it = pendingItems[i];
       const r = results[i];
-      let info: any, status: string, errMsg: string | null = null;
+      let info: any,
+        status: string,
+        errMsg: string | null = null;
       if (r.status === "fulfilled") {
         info = r.value;
         status = info.status;
@@ -288,19 +297,34 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         let info: any = null;
         if (r.status === "fulfilled") {
           info = r.value;
-          st = info.status === "available" ? "available"
-             : info.status === "registered" ? "registered"
-             : info.status === "reserved" ? "registered"
-             : info.status === "unsupported" ? "unsupported"
-             : info.status === "error" ? "error" : "unknown";
+          st =
+            info.status === "available"
+              ? "available"
+              : info.status === "registered"
+                ? "registered"
+                : info.status === "reserved"
+                  ? "registered"
+                  : info.status === "unsupported"
+                    ? "unsupported"
+                    : info.status === "error"
+                      ? "error"
+                      : "unknown";
         } else {
           st = "error";
         }
-        const sc = scoreDomain({ name: parsed.name, tld: parsed.tld, risk_level: "low" }, DEFAULT_WEIGHTS);
+        const sc = scoreDomain(
+          { name: parsed.name, tld: parsed.tld, risk_level: "low" },
+          DEFAULT_WEIGHTS,
+        );
         upserts.push({
-          domain: parsed.domain, name: parsed.name, tld: parsed.tld,
-          length: parsed.name.length, type: classifyDomain(parsed.name),
-          status: st, score: sc.total, risk_level: "low",
+          domain: parsed.domain,
+          name: parsed.name,
+          tld: parsed.tld,
+          length: parsed.name.length,
+          type: classifyDomain(parsed.name),
+          status: st,
+          score: sc.total,
+          risk_level: "low",
           source: "rdap-scan",
           last_checked_at: nowIso,
           expiry_date: info?.expiresDate ?? null,
@@ -310,7 +334,10 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         await db.from("domains").upsert(upserts, { onConflict: "domain" });
       }
     } catch (e: any) {
-      await logEvent(data.jobId, "domains_upsert_failed", { level: "warning", message: String(e?.message ?? e) });
+      await logEvent(data.jobId, "domains_upsert_failed", {
+        level: "warning",
+        message: String(e?.message ?? e),
+      });
     }
 
     const { data: cur } = await db
@@ -365,7 +392,10 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
         const { maybeAutoEnrich } = await import("./enrich-jobs.functions");
         await maybeAutoEnrich(data.jobId);
       } catch (e: any) {
-        await logEvent(data.jobId, "auto_enrich_failed", { level: "warning", message: String(e?.message ?? e) });
+        await logEvent(data.jobId, "auto_enrich_failed", {
+          level: "warning",
+          message: String(e?.message ?? e),
+        });
       }
     }
 
@@ -375,9 +405,9 @@ export const runJobBatchFn = createServerFn({ method: "POST" })
 const jobIdSchema = z.object({ jobId: z.string().uuid("无效的 jobId") });
 
 export const stopJobFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => jobIdSchema.parse(data))
+  .validator((data: unknown) => jobIdSchema.parse(data))
   .handler(async ({ data }) => {
-    const db = pgShim;
+    const db = await getDb();
     await db
       .from("jobs")
       .update({ status: "stopped", finished_at: new Date().toISOString() })
@@ -386,21 +416,10 @@ export const stopJobFn = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Delete a job entirely. job_items cascade via FK; job_events has no FK so it is
-// removed explicitly. enrich_jobs.source_job_id is ON DELETE SET NULL.
-export const deleteJobFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => jobIdSchema.parse(data))
-  .handler(async ({ data }) => {
-    const db = pgShim;
-    await db.from("job_events").delete().eq("job_id", data.jobId);
-    await db.from("jobs").delete().eq("id", data.jobId);
-    return { ok: true };
-  });
-
 export const requeueErrorsFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => jobIdSchema.parse(data))
+  .validator((data: unknown) => jobIdSchema.parse(data))
   .handler(async ({ data }) => {
-    const db = pgShim;
+    const db = await getDb();
     const { count: errCount } = await db
       .from("job_items")
       .select("id", { count: "exact", head: true })
@@ -438,12 +457,14 @@ export const requeueErrorsFn = createServerFn({ method: "POST" })
 
 const progressSchema = z.object({ jobId: z.string().uuid("无效的 jobId") });
 export const jobProgressFn = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => progressSchema.parse(d))
+  .validator((d: unknown) => progressSchema.parse(d))
   .handler(async ({ data }) => {
-    const db = pgShim;
+    const db = await getDb();
     const { data: job } = await db
       .from("jobs")
-      .select("id,name,status,total,checked,available,registered,errors,unsupported,started_at,finished_at")
+      .select(
+        "id,name,status,total,checked,available,registered,errors,unsupported,started_at,finished_at",
+      )
       .eq("id", data.jobId)
       .maybeSingle();
     if (!job) throw new Error("任务不存在");
@@ -457,8 +478,6 @@ export const jobProgressFn = createServerFn({ method: "POST" })
     return { job, errors: (errs ?? []) as { domain: string; error: string; checked_at: string }[] };
   });
 
-
-
 const recentSchema = z.object({
   jobId: z.string().uuid("无效的 jobId"),
   kind: z.enum(["available", "error"]),
@@ -466,9 +485,9 @@ const recentSchema = z.object({
 });
 
 export const recentItemsFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => recentSchema.parse(data))
+  .validator((data: unknown) => recentSchema.parse(data))
   .handler(async ({ data }) => {
-    const db = pgShim;
+    const db = await getDb();
     const { data: rows } = await db
       .from("job_items")
       .select("domain, error, checked_at")
@@ -480,24 +499,22 @@ export const recentItemsFn = createServerFn({ method: "POST" })
   });
 
 export const listRecentJobsFn = createServerFn({ method: "GET" }).handler(async () => {
-  const db = pgShim;
+  const db = await getDb();
   const { data } = await db
     .from("jobs")
-    .select("id, name, status, total, checked, available, registered, unsupported, errors, created_at")
+    .select(
+      "id, name, status, total, checked, available, registered, unsupported, errors, created_at",
+    )
     .order("created_at", { ascending: false })
     .limit(15);
   return (data || []) as any[];
 });
 
 export const getJobFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => jobIdSchema.parse(data))
+  .validator((data: unknown) => jobIdSchema.parse(data))
   .handler(async ({ data }) => {
-    const db = pgShim;
-    const { data: job } = await db
-      .from("jobs")
-      .select("*")
-      .eq("id", data.jobId)
-      .maybeSingle();
+    const db = await getDb();
+    const { data: job } = await db.from("jobs").select("*").eq("id", data.jobId).maybeSingle();
     return job as any;
   });
 
@@ -520,9 +537,9 @@ export interface JobEvent {
 }
 
 export const listJobEventsFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => listEventsSchema.parse(data))
+  .validator((data: unknown) => listEventsSchema.parse(data))
   .handler(async ({ data }) => {
-    const db = pgShim;
+    const db = await getDb();
     let q = db
       .from("job_events")
       .select("id, job_id, level, event, message, meta, created_at")
@@ -540,9 +557,9 @@ const errorReportSchema = z.object({
 });
 
 export const jobErrorReportFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => errorReportSchema.parse(data))
+  .validator((data: unknown) => errorReportSchema.parse(data))
   .handler(async ({ data }) => {
-    const db = pgShim;
+    const db = await getDb();
     const { data: rows } = await db
       .from("job_items")
       .select("domain, tld, error, checked_at")

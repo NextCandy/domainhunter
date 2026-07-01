@@ -1,12 +1,6 @@
 // Unified service-layer types shared by domain-availability / generator / pricing.
 
-export type DomainStatus =
-  | "available"
-  | "taken"
-  | "premium"
-  | "reserved"
-  | "invalid"
-  | "unknown";
+export type DomainStatus = "available" | "taken" | "premium" | "reserved" | "invalid" | "unknown";
 
 export interface DomainCheckResult {
   domain: string;

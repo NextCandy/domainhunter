@@ -19,9 +19,12 @@ function AdminTldsPage() {
   }, [data]);
 
   const parsed = useMemo(() => {
-    const list = text.split(/[\s,，\n]+/).map(s => s.trim().toLowerCase().replace(/^\./, "")).filter(Boolean);
+    const list = text
+      .split(/[\s,，\n]+/)
+      .map((s) => s.trim().toLowerCase().replace(/^\./, ""))
+      .filter(Boolean);
     const dedup = Array.from(new Set(list));
-    const invalid = dedup.filter(t => !/^[a-z0-9.\-]+$/.test(t) || t.length > 20);
+    const invalid = dedup.filter((t) => !/^[a-z0-9.-]+$/.test(t) || t.length > 20);
     return { dedup, invalid };
   }, [text]);
 
@@ -41,7 +44,8 @@ function AdminTldsPage() {
           <div>
             <h2 className="text-base font-semibold">域名后缀（TLD）管理</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              每行或逗号分隔一个后缀；支持二级后缀（如 com.cn / co.uk）。修改后会立刻应用到「过期域名发现」筛选区。
+              每行或逗号分隔一个后缀；支持二级后缀（如 com.cn /
+              co.uk）。修改后会立刻应用到「过期域名发现」筛选区。
             </p>
           </div>
           <div className="text-xs text-muted-foreground">
@@ -64,7 +68,8 @@ function AdminTldsPage() {
 
         {parsed.invalid.length > 0 && (
           <div className="mt-2 text-xs text-rose-600">
-            非法后缀：{parsed.invalid.slice(0, 10).join(", ")}{parsed.invalid.length > 10 ? "…" : ""}
+            非法后缀：{parsed.invalid.slice(0, 10).join(", ")}
+            {parsed.invalid.length > 10 ? "…" : ""}
           </div>
         )}
 

@@ -38,20 +38,34 @@ function AdminSettings() {
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["app-settings"], queryFn: () => getSettingsFn() });
   const [form, setForm] = useState<SettingsShape>({});
-  useEffect(() => { if (data) setForm(data as SettingsShape); }, [data]);
+  useEffect(() => {
+    if (data) setForm(data as SettingsShape);
+  }, [data]);
 
   const save = useMutation({
     mutationFn: () => saveSettingsFn({ data: { settings: form } }),
-    onSuccess: () => { toast.success("已保存"); qc.invalidateQueries({ queryKey: ["app-settings"] }); },
+    onSuccess: () => {
+      toast.success("已保存");
+      qc.invalidateQueries({ queryKey: ["app-settings"] });
+    },
     onError: (e: any) => toast.error(e?.message ?? "保存失败"),
   });
   const testNotify = useMutation({
-    mutationFn: () => sendTestNotificationFn({ data: { bark: form.notify_bark ?? "", webhook: form.notify_webhook ?? "" } }),
-    onSuccess: r => {
-      const okN = r.results.filter(x => x.ok).length;
+    mutationFn: () =>
+      sendTestNotificationFn({
+        data: { bark: form.notify_bark ?? "", webhook: form.notify_webhook ?? "" },
+      }),
+    onSuccess: (r) => {
+      const okN = r.results.filter((x) => x.ok).length;
       const failN = r.results.length - okN;
       if (failN === 0) toast.success(`已发送 ${okN} 条测试通知`);
-      else toast.warning(`成功 ${okN} · 失败 ${failN}：${r.results.filter(x => !x.ok).map(x => `${x.channel}(${x.status ?? x.error})`).join(", ")}`);
+      else
+        toast.warning(
+          `成功 ${okN} · 失败 ${failN}：${r.results
+            .filter((x) => !x.ok)
+            .map((x) => `${x.channel}(${x.status ?? x.error})`)
+            .join(", ")}`,
+        );
     },
     onError: (e: any) => toast.error(e?.message ?? "发送失败"),
   });
@@ -59,7 +73,12 @@ function AdminSettings() {
   const T = (k: keyof SettingsShape, label: string, placeholder?: string) => (
     <div>
       <label className="mb-1 block text-xs font-medium text-muted-foreground">{label}</label>
-      <input value={(form[k] as string) ?? ""} onChange={e => setForm({ ...form, [k]: e.target.value })} placeholder={placeholder} className="field" />
+      <input
+        value={(form[k] as string) ?? ""}
+        onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+        placeholder={placeholder}
+        className="field"
+      />
     </div>
   );
 
@@ -69,7 +88,7 @@ function AdminSettings() {
     bounds: { min: number; max: number; default: number },
     suffix?: string,
   ) => {
-    const cur = (form[k] as number | undefined);
+    const cur = form[k] as number | undefined;
     const placeholder = `默认 ${bounds.default}${suffix ?? ""} · 范围 ${bounds.min}–${bounds.max}`;
     return (
       <div>
@@ -79,9 +98,14 @@ function AdminSettings() {
           min={bounds.min}
           max={bounds.max}
           value={cur ?? ""}
-          onChange={e => {
+          onChange={(e) => {
             const v = e.target.value;
-            if (v === "") { const f = { ...form }; delete f[k]; setForm(f); return; }
+            if (v === "") {
+              const f = { ...form };
+              delete f[k];
+              setForm(f);
+              return;
+            }
             const n = Math.max(bounds.min, Math.min(bounds.max, Number(v)));
             setForm({ ...form, [k]: n });
           }}
@@ -114,14 +138,26 @@ function AdminSettings() {
           {N("notify_before_drop_days", "删除前提醒窗口", { min: 1, max: 30, default: 3 }, " 天")}
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <button onClick={() => testNotify.mutate()} disabled={testNotify.isPending || (!form.notify_bark && !form.notify_webhook)} className="btn-base btn-ghost"><Send className="h-4 w-4" />{testNotify.isPending ? "发送中…" : "发送测试通知"}</button>
-          <p className="text-[11px] text-muted-foreground">支持 Bark / 通用 Webhook（POST JSON）。</p>
+          <button
+            onClick={() => testNotify.mutate()}
+            disabled={testNotify.isPending || (!form.notify_bark && !form.notify_webhook)}
+            className="btn-base btn-ghost"
+          >
+            <Send className="h-4 w-4" />
+            {testNotify.isPending ? "发送中…" : "发送测试通知"}
+          </button>
+          <p className="text-[11px] text-muted-foreground">
+            支持 Bark / 通用 Webhook（POST JSON）。
+          </p>
         </div>
       </section>
 
       <section className="card-elev p-5 lg:col-span-2">
         <h3 className="mb-1 text-sm font-semibold">全局 RDAP / 批量任务默认值</h3>
-        <p className="mb-3 text-[11px] text-muted-foreground">在「批量 RDAP」表单新建任务时作为默认值预填，服务端仍以硬性边界（min/max）作为最终上限校验。</p>
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          在「批量
+          RDAP」表单新建任务时作为默认值预填，服务端仍以硬性边界（min/max）作为最终上限校验。
+        </p>
         <div className="grid gap-3 sm:grid-cols-3">
           {N("limit_default_qps", "QPS", LIMITS.qps)}
           {N("limit_default_concurrency", "并发", LIMITS.concurrency)}
@@ -134,7 +170,9 @@ function AdminSettings() {
 
       <section className="card-elev p-5 lg:col-span-2">
         <h3 className="mb-1 text-sm font-semibold">Enrich 默认参数 & 缓存 TTL</h3>
-        <p className="mb-3 text-[11px] text-muted-foreground">DNS / Archive / SEO 抓取的默认执行参数与缓存有效期。命中缓存的请求不消耗外部 API 配额。</p>
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          DNS / Archive / SEO 抓取的默认执行参数与缓存有效期。命中缓存的请求不消耗外部 API 配额。
+        </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {N("enrich_default_qps", "Enrich QPS", ENRICH_LIMITS.qps)}
           {N("enrich_default_concurrency", "Enrich 并发", ENRICH_LIMITS.concurrency)}
@@ -147,7 +185,13 @@ function AdminSettings() {
       </section>
 
       <div className="lg:col-span-2">
-        <button onClick={() => save.mutate()} disabled={save.isPending} className="btn-base btn-primary">{save.isPending ? "保存中…" : "保存全部设置"}</button>
+        <button
+          onClick={() => save.mutate()}
+          disabled={save.isPending}
+          className="btn-base btn-primary"
+        >
+          {save.isPending ? "保存中…" : "保存全部设置"}
+        </button>
       </div>
     </div>
   );

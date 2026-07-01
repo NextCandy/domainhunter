@@ -25,23 +25,34 @@ function AdminScoring() {
   const { data } = useQuery({ queryKey: ["scoring"], queryFn: () => getScoringFn() });
   const [weights, setWeights] = useState<ScoringWeights>(DEFAULT_WEIGHTS);
 
-  useEffect(() => { if (data) setWeights({ ...DEFAULT_WEIGHTS, ...data }); }, [data]);
+  useEffect(() => {
+    if (data) setWeights({ ...DEFAULT_WEIGHTS, ...data });
+  }, [data]);
 
   const saveMut = useMutation({
     mutationFn: () => saveScoringFn({ data: { weights } }),
-    onSuccess: () => { toast.success("已保存评分规则"); qc.invalidateQueries({ queryKey: ["scoring"] }); },
+    onSuccess: () => {
+      toast.success("已保存评分规则");
+      qc.invalidateQueries({ queryKey: ["scoring"] });
+    },
     onError: (e: any) => toast.error(e?.message ?? "保存失败"),
   });
 
-  const total = Object.entries(weights).filter(([k]) => k !== "risk_penalty_max").reduce((s, [, v]) => s + (v as number), 0);
+  const total = Object.entries(weights)
+    .filter(([k]) => k !== "risk_penalty_max")
+    .reduce((s, [, v]) => s + (v as number), 0);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
       <section className="card-elev p-5">
         <h3 className="mb-3 text-sm font-semibold">评分权重（满分 100）</h3>
-        <p className="mb-4 text-xs text-muted-foreground">非扣分项之和当前 = <span className="font-semibold text-foreground tabular-nums">{total}</span> 分。建议合计 100。</p>
+        <p className="mb-4 text-xs text-muted-foreground">
+          非扣分项之和当前 ={" "}
+          <span className="font-semibold text-foreground tabular-nums">{total}</span> 分。建议合计
+          100。
+        </p>
         <div className="space-y-4">
-          {FIELDS.map(f => (
+          {FIELDS.map((f) => (
             <div key={f.key}>
               <div className="mb-1 flex items-center justify-between text-sm">
                 <div>
@@ -55,28 +66,38 @@ function AdminScoring() {
                 min={0}
                 max={f.key === "risk_penalty_max" ? 40 : 40}
                 value={weights[f.key]}
-                onChange={e => setWeights({ ...weights, [f.key]: +e.target.value })}
+                onChange={(e) => setWeights({ ...weights, [f.key]: +e.target.value })}
                 className="w-full accent-primary"
               />
             </div>
           ))}
         </div>
         <div className="mt-5 flex gap-2">
-          <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="btn-base btn-primary">{saveMut.isPending ? "保存中…" : "保存"}</button>
-          <button onClick={() => setWeights(DEFAULT_WEIGHTS)} className="btn-base btn-ghost">恢复默认</button>
+          <button
+            onClick={() => saveMut.mutate()}
+            disabled={saveMut.isPending}
+            className="btn-base btn-primary"
+          >
+            {saveMut.isPending ? "保存中…" : "保存"}
+          </button>
+          <button onClick={() => setWeights(DEFAULT_WEIGHTS)} className="btn-base btn-ghost">
+            恢复默认
+          </button>
         </div>
       </section>
 
       <section className="card-elev p-5">
         <h3 className="mb-3 text-sm font-semibold">评分示例</h3>
-        <p className="mb-3 text-xs text-muted-foreground">仅显示规则结构，重导入或刷新域名后将按新权重计算。</p>
+        <p className="mb-3 text-xs text-muted-foreground">
+          仅显示规则结构，重导入或刷新域名后将按新权重计算。
+        </p>
         <div className="space-y-2 text-xs">
           {[
             { d: "ai.com", n: "S 级 · 95 · 短 + .com" },
             { d: "trade.io", n: "A 级 · 82 · 英文词 + .io" },
             { d: "shop123.net", n: "B 级 · 64 · 数字字母混合" },
             { d: "x-y-z.xyz", n: "C 级 · 38 · 含连字符 + .xyz" },
-          ].map(s => (
+          ].map((s) => (
             <div key={s.d} className="rounded-md border border-border p-2">
               <div className="font-mono text-sm">{s.d}</div>
               <div className="text-muted-foreground">{s.n}</div>

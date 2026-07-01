@@ -1,13 +1,33 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { hashPassword } from "@/lib/auth.server";
-import { requireAdmin } from "@/lib/auth-guards";
-import { query, withClient } from "@/lib/db.server";
 
-export const listUsersFn = createServerFn({ method: "POST" })
-  .middleware([requireAdmin])
-  .handler(async () => {
-    const { rows } = await query(`
+async function ensureAdmin() {
+  const [{ getRequest }, { hasRole, verifyToken }] = await Promise.all([
+    import("@tanstack/react-start/server"),
+    import("@/lib/auth.server"),
+  ]);
+  const authHeader = getRequest()?.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) throw new Error("未登录或登录已过期");
+  const claims = verifyToken(authHeader.replace("Bearer ", "").trim());
+  if (!claims.sub || !(await hasRole(claims.sub, "admin"))) {
+    throw new Error("仅管理员可访问该操作");
+  }
+  return { userId: claims.sub };
+}
+
+async function queryDb(sql: string, params?: unknown[]) {
+  const { query } = await import("@/lib/db.server");
+  return query(sql, params);
+}
+
+async function withDbClient<T>(fn: Parameters<typeof import("@/lib/db.server").withClient<T>>[0]) {
+  const { withClient } = await import("@/lib/db.server");
+  return withClient(fn);
+}
+
+export const listUsersFn = createServerFn({ method: "POST" }).handler(async () => {
+  await ensureAdmin();
+  const { rows } = await queryDb(`
       SELECT
         u.id,
         u.email,
@@ -21,16 +41,16 @@ export const listUsersFn = createServerFn({ method: "POST" })
       ORDER BY u.created_at DESC
       LIMIT 200
     `);
-    return rows;
-  });
+  return rows;
+});
 
 const userIdSchema = z.object({ userId: z.string().uuid() });
 
 export const grantAdminFn = createServerFn({ method: "POST" })
-  .middleware([requireAdmin])
-  .inputValidator((d: unknown) => userIdSchema.parse(d))
+  .validator((d: unknown) => userIdSchema.parse(d))
   .handler(async ({ data }) => {
-    await query(
+    await ensureAdmin();
+    await queryDb(
       `INSERT INTO public.user_roles (user_id, role)
        VALUES ($1, 'admin')
        ON CONFLICT (user_id, role) DO NOTHING`,
@@ -40,25 +60,30 @@ export const grantAdminFn = createServerFn({ method: "POST" })
   });
 
 export const revokeAdminFn = createServerFn({ method: "POST" })
-  .middleware([requireAdmin])
-  .inputValidator((d: unknown) => userIdSchema.parse(d))
-  .handler(async ({ data, context }) => {
+  .validator((d: unknown) => userIdSchema.parse(d))
+  .handler(async ({ data }) => {
+    const context = await ensureAdmin();
     if (data.userId === context.userId) throw new Error("不能撤销自己的管理员权限");
-    await query(`DELETE FROM public.user_roles WHERE user_id = $1 AND role = 'admin'`, [data.userId]);
+    await queryDb(`DELETE FROM public.user_roles WHERE user_id = $1 AND role = 'admin'`, [
+      data.userId,
+    ]);
     return { ok: true };
   });
 
 export const resetUserPasswordFn = createServerFn({ method: "POST" })
-  .middleware([requireAdmin])
-  .inputValidator((d: unknown) =>
-    z.object({
-      userId: z.string().uuid(),
-      password: z.string().min(6, "密码至少 6 位").max(200, "密码过长"),
-    }).parse(d),
+  .validator((d: unknown) =>
+    z
+      .object({
+        userId: z.string().uuid(),
+        password: z.string().min(6, "密码至少 6 位").max(200, "密码过长"),
+      })
+      .parse(d),
   )
   .handler(async ({ data }) => {
+    await ensureAdmin();
+    const { hashPassword } = await import("@/lib/auth.server");
     const passwordHash = await hashPassword(data.password);
-    await withClient(async (client) => {
+    await withDbClient(async (client) => {
       const result = await client.query(
         `UPDATE public.app_users
          SET password_hash = $2,

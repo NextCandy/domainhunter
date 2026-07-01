@@ -1,155 +1,342 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { AppShell, PageHeader, EmptyState } from "@/components/app-shell";
+import { useMemo, useState } from "react";
+import { BriefcaseBusiness, Download, Plus, Search, Trash2 } from "lucide-react";
+import { AppShell, PageHeader, EmptyState, StatCard } from "@/components/app-shell";
 import { CardSkeleton } from "@/components/skeleton";
-import { ImportPanel } from "@/components/import-panel";
-import { ApiImportPanel } from "@/components/api-import-panel";
-import { listMyDomainsFn, upsertMyDomainFn, removeMyDomainFn, importMyDomainsFn, importMyDomainsFromApiFn } from "@/lib/discover.functions";
+import {
+  enrichTerminalRow,
+  exportDomainsCsv,
+  formatCompactCurrency,
+  formatCurrency,
+  type TerminalDomainRow,
+} from "@/lib/domain-terminal";
+import { listMyDomainsFn, upsertMyDomainFn, removeMyDomainFn } from "@/lib/discover.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/my-domains")({
   component: MyDomainsPage,
 });
 
+type PortfolioRecord = {
+  id: number;
+  domain: string;
+  registrar?: string | null;
+  expiry_date?: string | null;
+  note?: string | null;
+  tags?: string[];
+};
+
+type PortfolioRow = PortfolioRecord & { terminal: TerminalDomainRow };
+
 function MyDomainsPage() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ["my-domains"], queryFn: () => listMyDomainsFn() });
-  const [form, setForm] = useState({ domain: "", registrar: "", expiry_date: "", note: "", tags: "" });
+  const { data, isLoading } = useQuery({
+    queryKey: ["my-domains"],
+    queryFn: loadPortfolio,
+  });
+  const [q, setQ] = useState("");
+  const [form, setForm] = useState({
+    domain: "",
+    registrar: "",
+    expiry_date: "",
+    note: "",
+    tags: "",
+  });
 
   const addMut = useMutation({
-    mutationFn: (f: typeof form) => upsertMyDomainFn({ data: {
-      domain: f.domain, registrar: f.registrar || undefined,
-      expiry_date: f.expiry_date || undefined, note: f.note || undefined,
-      tags: f.tags ? f.tags.split(",").map(t => t.trim()).filter(Boolean) : undefined,
-    } }),
-    onSuccess: () => { toast.success("已保存"); setForm({ domain: "", registrar: "", expiry_date: "", note: "", tags: "" }); qc.invalidateQueries({ queryKey: ["my-domains"] }); },
-    onError: (e: any) => toast.error(e?.message ?? "保存失败"),
+    mutationFn: async (f: typeof form) => {
+      const payload = portfolioPayload(f);
+      try {
+        return await upsertMyDomainFn({ data: payload });
+      } catch {
+        const res = await fetch("/api/portfolio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("保存失败");
+        return res.json();
+      }
+    },
+    onSuccess: () => {
+      toast.success("已保存资产");
+      setForm({ domain: "", registrar: "", expiry_date: "", note: "", tags: "" });
+      qc.invalidateQueries({ queryKey: ["my-domains"] });
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "保存失败"),
   });
   const delMut = useMutation({
-    mutationFn: (id: number) => removeMyDomainFn({ data: { id } }),
+    mutationFn: async (id: number) => {
+      try {
+        return await removeMyDomainFn({ data: { id } });
+      } catch {
+        const res = await fetch(`/api/portfolio?id=${encodeURIComponent(String(id))}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error("删除失败");
+        return res.json();
+      }
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["my-domains"] }),
   });
 
-  // ── Client-side sorting ──
-  const [sort, setSort] = useState<{ by: string; dir: "asc" | "desc" }>({ by: "expiry_date", dir: "asc" });
-  const toggleSort = (by: string) => setSort(s => s.by === by ? { by, dir: s.dir === "asc" ? "desc" : "asc" } : { by, dir: "asc" });
-  const sortIcon = (by: string) => sort.by === by ? (sort.dir === "asc" ? " ↑" : " ↓") : "";
-  const isDate = (by: string) => by === "registration_date" || by === "expiry_date";
-  const sorted = [...(data ?? [])].sort((a: any, b: any) => {
-    const av = a?.[sort.by] ?? null, bv = b?.[sort.by] ?? null;
-    let r: number;
-    if (av == null && bv == null) r = 0;
-    else if (av == null) r = 1;
-    else if (bv == null) r = -1;
-    else if (isDate(sort.by)) r = new Date(av).getTime() - new Date(bv).getTime();
-    else r = String(av).localeCompare(String(bv), "zh");
-    return sort.dir === "asc" ? r : -r;
-  });
-  const fmtDate = (s?: string | null) => { if (!s) return "—"; try { return new Date(s).toISOString().slice(0, 10); } catch { return "—"; } };
+  const rows = useMemo(
+    () =>
+      ((data ?? []) as PortfolioRecord[])
+        .map((d, i): PortfolioRow => ({
+          ...d,
+          terminal: enrichTerminalRow(
+            {
+              domain: d.domain,
+              expiry_date: d.expiry_date,
+              status: "registered",
+              source: "database",
+            },
+            i,
+          ),
+        }))
+        .filter((d) => {
+          const needle = q.toLowerCase();
+          return (
+            !needle ||
+            d.domain.includes(needle) ||
+            (d.registrar ?? "").toLowerCase().includes(needle) ||
+            (d.note ?? "").toLowerCase().includes(needle)
+          );
+        }),
+    [data, q],
+  );
+
+  const stats = useMemo(() => {
+    const domains = rows.map((r) => r.terminal);
+    const soon = rows.filter(
+      (r) => r.expiry_date && new Date(r.expiry_date).getTime() < Date.now() + 45 * 86400000,
+    ).length;
+    return {
+      total: rows.length,
+      value: Math.round(
+        domains.reduce((s: number, d: TerminalDomainRow) => s + d.estimatedValue, 0),
+      ),
+      soon,
+      registrars: new Set(rows.map((r) => r.registrar).filter(Boolean)).size,
+    };
+  }, [rows]);
+
+  function exportPortfolio() {
+    const domains = rows.map((r) => r.terminal);
+    const blob = new Blob([exportDomainsCsv(domains)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `domainhunter-portfolio-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <AppShell>
-      <PageHeader title="我的域名" description="管理已购买的域名，到期前可手动提醒。" />
+      <PageHeader
+        title="Portfolio 资产组合"
+        description="管理已购买或重点跟踪的域名资产，记录注册商、到期时间、标签与估值"
+        actions={
+          <button onClick={exportPortfolio} disabled={!rows.length} className="btn-base btn-ghost">
+            <Download className="h-4 w-4" />
+            导出 CSV
+          </button>
+        }
+      />
 
-      <div className="mb-4 flex flex-wrap items-start gap-2">
-        <ImportPanel
-          title="批量导入到我的域名"
-          onImport={(text) => importMyDomainsFn({ data: { text } })}
-          onDone={() => qc.invalidateQueries({ queryKey: ["my-domains"] })}
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="资产数量"
+          value={stats.total.toLocaleString()}
+          icon={<BriefcaseBusiness className="h-4 w-4" />}
         />
-        <ApiImportPanel
-          onImport={(args) => importMyDomainsFromApiFn({ data: args })}
-          onDone={() => qc.invalidateQueries({ queryKey: ["my-domains"] })}
+        <StatCard
+          label="组合估值"
+          value={
+            <>
+              <span className="sm:hidden">{formatCompactCurrency(stats.value)}</span>
+              <span className="hidden sm:inline">{formatCurrency(stats.value)}</span>
+            </>
+          }
+          tone="warning"
         />
+        <StatCard
+          label="45 天内到期"
+          value={stats.soon.toLocaleString()}
+          tone={stats.soon ? "danger" : "success"}
+        />
+        <StatCard label="注册商" value={stats.registrars.toLocaleString()} />
       </div>
 
       <form
-        onSubmit={e => { e.preventDefault(); if (!form.domain) return; addMut.mutate(form); }}
-        className="card-elev mb-6 grid grid-cols-1 gap-2 p-3 sm:grid-cols-[1.5fr_1fr_1fr_2fr_1fr_auto]"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!form.domain) return;
+          addMut.mutate(form);
+        }}
+        className="terminal-panel mb-4 grid grid-cols-1 gap-2 p-3 lg:grid-cols-[1.3fr_1fr_1fr_1.6fr_1fr_auto]"
       >
-        <input value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })} placeholder="example.com" className="field" />
-        <input value={form.registrar} onChange={e => setForm({ ...form, registrar: e.target.value })} placeholder="注册商" className="field" />
-        <input value={form.expiry_date} onChange={e => setForm({ ...form, expiry_date: e.target.value })} type="date" className="field" />
-        <input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="备注" className="field" />
-        <input value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} placeholder="标签1,标签2" className="field" />
-        <button type="submit" className="btn-base btn-primary"><Plus className="h-4 w-4" />添加</button>
+        <input
+          value={form.domain}
+          onChange={(e) => setForm({ ...form, domain: e.target.value })}
+          placeholder="example.com"
+          className="field"
+        />
+        <input
+          value={form.registrar}
+          onChange={(e) => setForm({ ...form, registrar: e.target.value })}
+          placeholder="注册商"
+          className="field"
+        />
+        <input
+          value={form.expiry_date}
+          onChange={(e) => setForm({ ...form, expiry_date: e.target.value })}
+          type="date"
+          className="field"
+        />
+        <input
+          value={form.note}
+          onChange={(e) => setForm({ ...form, note: e.target.value })}
+          placeholder="备注 / 购买价 / 用途"
+          className="field"
+        />
+        <input
+          value={form.tags}
+          onChange={(e) => setForm({ ...form, tags: e.target.value })}
+          placeholder="标签1,标签2"
+          className="field"
+        />
+        <button type="submit" className="btn-base btn-primary">
+          <Plus className="h-4 w-4" />
+          添加
+        </button>
       </form>
+
+      <div className="terminal-panel mb-4 p-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="搜索资产域名、注册商或备注"
+            className="field pl-8"
+          />
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} lines={2} />)}
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} lines={2} />
+          ))}
         </div>
-      ) : !data?.length ? (
-        <EmptyState title="还没有添加任何已购域名" hint="使用上方表单添加。" />
+      ) : !rows.length ? (
+        <EmptyState
+          title="还没有添加任何资产域名"
+          hint="使用上方表单添加，或后续从 Hunt 结果一键加入。"
+        />
       ) : (
-        <>
-          {/* Desktop table */}
-          <div className="card-elev hidden overflow-hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-sm">
-                <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="cursor-pointer px-4 py-2 text-left font-medium" onClick={() => toggleSort("domain")}>域名{sortIcon("domain")}</th>
-                    <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => toggleSort("registrar")}>注册商{sortIcon("registrar")}</th>
-                    <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => toggleSort("registration_date")}>注册日期{sortIcon("registration_date")}</th>
-                    <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => toggleSort("expiry_date")}>到期日期{sortIcon("expiry_date")}</th>
-                    <th className="cursor-pointer px-3 py-2 text-left font-medium" onClick={() => toggleSort("dns_status")}>DNS{sortIcon("dns_status")}</th>
-                    <th className="px-3 py-2 text-left font-medium">标签</th>
-                    <th className="px-3 py-2 text-left font-medium">备注</th>
-                    <th className="px-4 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((d: any) => (
-                    <tr key={d.id} className="border-b border-border last:border-0 hover:bg-accent/40">
-                      <td className="px-4 py-2 font-medium">{d.domain}</td>
+        <div className="terminal-panel overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead className="border-b border-border bg-surface/70 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium">域名</th>
+                  <th className="px-3 py-2 text-left font-medium">注册商</th>
+                  <th className="px-3 py-2 text-left font-medium">到期时间</th>
+                  <th className="px-3 py-2 text-right font-medium">估值</th>
+                  <th className="px-3 py-2 text-left font-medium">标签</th>
+                  <th className="px-3 py-2 text-left font-medium">备注</th>
+                  <th className="px-4 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((d) => {
+                  const term = d.terminal;
+                  const soon =
+                    d.expiry_date && new Date(d.expiry_date).getTime() < Date.now() + 45 * 86400000;
+                  return (
+                    <tr
+                      key={d.id}
+                      className="border-b border-border last:border-0 hover:bg-accent/40"
+                    >
+                      <td className="px-4 py-2">
+                        <div className="font-mono font-semibold text-primary">{d.domain}</div>
+                        <div className="text-xs text-muted-foreground">
+                          DA {term.da} / PA {term.pa}
+                        </div>
+                      </td>
                       <td className="px-3 py-2 text-muted-foreground">{d.registrar ?? "—"}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{fmtDate(d.registration_date)}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{fmtDate(d.expiry_date)}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{d.dns_status ?? "—"}</td>
-                      <td className="px-3 py-2"><div className="flex flex-wrap gap-1">{(d.tags ?? []).map((t: string) => <span key={t} className="chip">{t}</span>)}</div></td>
+                      <td
+                        className={`px-3 py-2 text-xs ${soon ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {d.expiry_date ? new Date(d.expiry_date).toISOString().slice(0, 10) : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-warning">
+                        {term.estimatedRange}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {(d.tags ?? []).map((t: string) => (
+                            <span key={t} className="glass-chip">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{d.note ?? "—"}</td>
-                      <td className="px-4 py-2 text-right"><button onClick={() => delMut.mutate(d.id)} className="grid h-7 w-7 place-items-center rounded text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button></td>
+                      <td className="px-4 py-2 text-right">
+                        <button
+                          onClick={() => delMut.mutate(d.id)}
+                          className="grid h-8 w-8 place-items-center rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10"
+                          aria-label="删除"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-
-          {/* Mobile cards */}
-          <div className="space-y-2 md:hidden">
-            <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-              <span>排序：</span>
-              {[["expiry_date", "到期"], ["registration_date", "注册"], ["domain", "域名"], ["registrar", "注册商"]].map(([by, lbl]) => (
-                <button key={by} onClick={() => toggleSort(by)} className={`rounded-md border px-2 py-0.5 ${sort.by === by ? "border-primary bg-primary/10 text-primary" : "border-border"}`}>{lbl}{sortIcon(by)}</button>
-              ))}
-            </div>
-            {sorted.map((d: any) => (
-              <div key={d.id} className="card-elev p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="min-w-0 truncate text-sm font-semibold">{d.domain}</span>
-                  <button onClick={() => delMut.mutate(d.id)} className="shrink-0 grid h-6 w-6 place-items-center rounded text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button>
-                </div>
-                <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>注册商：{d.registrar ?? "—"}</span>
-                  <span>DNS：{d.dns_status ?? "—"}</span>
-                  <span>注册：{fmtDate(d.registration_date)}</span>
-                  <span>到期：{fmtDate(d.expiry_date)}</span>
-                </div>
-                {(d.tags?.length || d.note) && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                    {(d.tags ?? []).map((t: string) => <span key={t} className="chip">{t}</span>)}
-                    {d.note && <span className="text-xs text-muted-foreground">{d.note}</span>}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
+        </div>
       )}
     </AppShell>
   );
+}
+
+async function loadPortfolio(): Promise<PortfolioRecord[]> {
+  try {
+    return (await listMyDomainsFn()) as PortfolioRecord[];
+  } catch {
+    const res = await fetch("/api/portfolio");
+    if (!res.ok) throw new Error("资产组合加载失败");
+    const data = await res.json();
+    return (data.rows ?? []) as PortfolioRecord[];
+  }
+}
+
+function portfolioPayload(form: {
+  domain: string;
+  registrar: string;
+  expiry_date: string;
+  note: string;
+  tags: string;
+}) {
+  return {
+    domain: form.domain,
+    registrar: form.registrar || undefined,
+    expiry_date: form.expiry_date || undefined,
+    note: form.note || undefined,
+    tags: form.tags
+      ? form.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : undefined,
+  };
 }

@@ -79,30 +79,81 @@ class Builder<T = any> {
     this.selectCols = cols || "*";
     if (opts?.count === "exact") this.countMode = "exact";
     if (opts?.head) this.headOnly = true;
-    if (this.mode === "insert" || this.mode === "upsert" || this.mode === "update" || this.mode === "delete") {
+    if (
+      this.mode === "insert" ||
+      this.mode === "upsert" ||
+      this.mode === "update" ||
+      this.mode === "delete"
+    ) {
       this.returning = true;
     }
     return this;
   }
-  eq(col: string, val: unknown) { this.filters.push({ kind: "eq", col, val }); return this; }
-  neq(col: string, val: unknown) { this.filters.push({ kind: "neq", col, val }); return this; }
-  gt(col: string, val: unknown) { this.filters.push({ kind: "gt", col, val }); return this; }
-  gte(col: string, val: unknown) { this.filters.push({ kind: "gte", col, val }); return this; }
-  lt(col: string, val: unknown) { this.filters.push({ kind: "lt", col, val }); return this; }
-  lte(col: string, val: unknown) { this.filters.push({ kind: "lte", col, val }); return this; }
-  is(col: string, val: unknown) { this.filters.push({ kind: "is", col, val }); return this; }
-  like(col: string, val: string) { this.filters.push({ kind: "like", col, val }); return this; }
-  ilike(col: string, val: string) { this.filters.push({ kind: "ilike", col, val }); return this; }
-  in(col: string, vals: unknown[]) { this.filters.push({ kind: "in", col, vals }); return this; }
-  not(col: string, op: Cmp, val: unknown) { this.filters.push({ kind: "not", col, op, val }); return this; }
+  eq(col: string, val: unknown) {
+    this.filters.push({ kind: "eq", col, val });
+    return this;
+  }
+  neq(col: string, val: unknown) {
+    this.filters.push({ kind: "neq", col, val });
+    return this;
+  }
+  gt(col: string, val: unknown) {
+    this.filters.push({ kind: "gt", col, val });
+    return this;
+  }
+  gte(col: string, val: unknown) {
+    this.filters.push({ kind: "gte", col, val });
+    return this;
+  }
+  lt(col: string, val: unknown) {
+    this.filters.push({ kind: "lt", col, val });
+    return this;
+  }
+  lte(col: string, val: unknown) {
+    this.filters.push({ kind: "lte", col, val });
+    return this;
+  }
+  is(col: string, val: unknown) {
+    this.filters.push({ kind: "is", col, val });
+    return this;
+  }
+  like(col: string, val: string) {
+    this.filters.push({ kind: "like", col, val });
+    return this;
+  }
+  ilike(col: string, val: string) {
+    this.filters.push({ kind: "ilike", col, val });
+    return this;
+  }
+  in(col: string, vals: unknown[]) {
+    this.filters.push({ kind: "in", col, vals });
+    return this;
+  }
+  not(col: string, op: Cmp, val: unknown) {
+    this.filters.push({ kind: "not", col, op, val });
+    return this;
+  }
   order(col: string, opts?: { ascending?: boolean; nullsFirst?: boolean }) {
     this.orders.push({ col, asc: opts?.ascending !== false, nullsFirst: opts?.nullsFirst });
     return this;
   }
-  limit(n: number) { this.limitN = n; return this; }
-  range(from: number, to: number) { this.offsetN = from; this.rangeTo = to; return this; }
-  single() { this.singleMode = "single"; return this; }
-  maybeSingle() { this.singleMode = "maybe"; return this; }
+  limit(n: number) {
+    this.limitN = n;
+    return this;
+  }
+  range(from: number, to: number) {
+    this.offsetN = from;
+    this.rangeTo = to;
+    return this;
+  }
+  single() {
+    this.singleMode = "single";
+    return this;
+  }
+  maybeSingle() {
+    this.singleMode = "maybe";
+    return this;
+  }
 
   // ── mutations ────────────────────────────────────────────────────────────
   insert(rows: Record<string, unknown> | Record<string, unknown>[]) {
@@ -115,7 +166,10 @@ class Builder<T = any> {
     this.updatePatch = patch;
     return this;
   }
-  upsert(rows: Record<string, unknown> | Record<string, unknown>[], opts?: { onConflict?: string; ignoreDuplicates?: boolean }) {
+  upsert(
+    rows: Record<string, unknown> | Record<string, unknown>[],
+    opts?: { onConflict?: string; ignoreDuplicates?: boolean },
+  ) {
     this.mode = "upsert";
     this.insertRows = Array.isArray(rows) ? rows : [rows];
     this.onConflict = opts?.onConflict ?? null;
@@ -159,10 +213,15 @@ class Builder<T = any> {
   private orderLimitSql(): string {
     let s = "";
     if (this.orders.length) {
-      s += " ORDER BY " + this.orders.map((o) => {
-        const nulls = o.nullsFirst === undefined ? "" : o.nullsFirst ? " NULLS FIRST" : " NULLS LAST";
-        return `${ident(o.col)} ${o.asc ? "ASC" : "DESC"}${nulls}`;
-      }).join(", ");
+      s +=
+        " ORDER BY " +
+        this.orders
+          .map((o) => {
+            const nulls =
+              o.nullsFirst === undefined ? "" : o.nullsFirst ? " NULLS FIRST" : " NULLS LAST";
+            return `${ident(o.col)} ${o.asc ? "ASC" : "DESC"}${nulls}`;
+          })
+          .join(", ");
     }
     if (this.rangeTo != null) {
       const limit = this.rangeTo - this.offsetN + 1;
@@ -174,7 +233,11 @@ class Builder<T = any> {
     return s;
   }
 
-  private async exec(): Promise<{ data: T | T[] | null; error: { message: string } | null; count: number | null }> {
+  private async exec(): Promise<{
+    data: T | T[] | null;
+    error: { message: string } | null;
+    count: number | null;
+  }> {
     try {
       let result: { rows: any[]; rowCount: number } = { rows: [], rowCount: 0 };
       let countVal: number | null = null;
@@ -183,7 +246,10 @@ class Builder<T = any> {
         // count if requested
         if (this.countMode === "exact") {
           const { sql: where, params } = this.buildWhere(1);
-          const c = await query<{ c: string }>(`SELECT COUNT(*)::text AS c FROM ${ident(this.table)}${where}`, params);
+          const c = await query<{ c: string }>(
+            `SELECT COUNT(*)::text AS c FROM ${ident(this.table)}${where}`,
+            params,
+          );
           countVal = Number(c.rows[0]?.c ?? 0);
         }
         if (!this.headOnly) {
@@ -196,9 +262,7 @@ class Builder<T = any> {
         if (this.insertRows.length === 0) {
           return { data: this.returning ? [] : null, error: null, count: null };
         }
-        const cols = Array.from(
-          new Set(this.insertRows.flatMap((r) => Object.keys(r))),
-        );
+        const cols = Array.from(new Set(this.insertRows.flatMap((r) => Object.keys(r))));
         const params: unknown[] = [];
         let i = 1;
         const valueRows = this.insertRows.map((r) => {
@@ -211,13 +275,21 @@ class Builder<T = any> {
         let sql = `INSERT INTO ${ident(this.table)} (${cols.map(ident).join(", ")}) VALUES ${valueRows.join(", ")}`;
         if (this.mode === "upsert") {
           const conflictCols = this.onConflict
-            ? this.onConflict.split(",").map((c) => ident(c.trim())).join(", ")
+            ? this.onConflict
+                .split(",")
+                .map((c) => ident(c.trim()))
+                .join(", ")
             : "";
           if (this.ignoreDup || !conflictCols) {
             sql += ` ON CONFLICT ${conflictCols ? `(${conflictCols}) ` : ""}DO NOTHING`;
           } else {
             const updates = cols
-              .filter((c) => !this.onConflict!.split(",").map((s) => s.trim()).includes(c))
+              .filter(
+                (c) =>
+                  !this.onConflict!.split(",")
+                    .map((s) => s.trim())
+                    .includes(c),
+              )
               .map((c) => `${ident(c)} = EXCLUDED.${ident(c)}`)
               .join(", ");
             sql += ` ON CONFLICT (${conflictCols}) DO UPDATE SET ${updates || `${ident(cols[0])} = EXCLUDED.${ident(cols[0])}`}`;
@@ -250,7 +322,11 @@ class Builder<T = any> {
       let data: any = result.rows;
       if (this.singleMode === "single") {
         if (result.rows.length === 0) {
-          return { data: null, error: { message: "JSON object requested, multiple (or no) rows returned" }, count: countVal };
+          return {
+            data: null,
+            error: { message: "JSON object requested, multiple (or no) rows returned" },
+            count: countVal,
+          };
         }
         data = result.rows[0];
       } else if (this.singleMode === "maybe") {
@@ -266,7 +342,8 @@ class Builder<T = any> {
 
   // Thenable: makes `await builder` work.
   then<TR1 = any, TR2 = never>(
-    onFulfilled?: ((value: { data: any; error: any; count: number | null }) => TR1 | PromiseLike<TR1>) | null,
+    onFulfilled?:
+      ((value: { data: any; error: any; count: number | null }) => TR1 | PromiseLike<TR1>) | null,
     onRejected?: ((reason: any) => TR2 | PromiseLike<TR2>) | null,
   ): Promise<TR1 | TR2> {
     return this.exec().then(onFulfilled as any, onRejected as any);
@@ -279,7 +356,12 @@ function serializeValue(v: unknown): unknown {
   if (v instanceof Date) return v.toISOString();
   if (Array.isArray(v)) {
     // pg can take arrays directly only for typed arrays; JSONify objects.
-    if (v.every((x) => typeof x === "string" || typeof x === "number" || typeof x === "boolean" || x === null)) {
+    if (
+      v.every(
+        (x) =>
+          typeof x === "string" || typeof x === "number" || typeof x === "boolean" || x === null,
+      )
+    ) {
       return v;
     }
     return JSON.stringify(v);

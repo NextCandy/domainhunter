@@ -11,7 +11,10 @@ export const Route = createFileRoute("/api/public/hooks/sync-prices")({
         const apikey = request.headers.get("apikey");
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
         if (!apikey || !expected || apikey !== expected) {
-          return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+          return new Response(JSON.stringify({ error: "unauthorized" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          });
         }
         try {
           const results = await syncAllRegistrarPricesInternal();

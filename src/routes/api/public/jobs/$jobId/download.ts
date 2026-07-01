@@ -11,7 +11,6 @@ function csvEscape(v: unknown): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-
 export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
   server: {
     handlers: {
@@ -28,11 +27,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
         const { pgShim } = await import("@/lib/pg-shim.server");
         const db = pgShim;
 
-        const { data: job } = await db
-          .from("jobs")
-          .select("name")
-          .eq("id", jobId)
-          .maybeSingle();
+        const { data: job } = await db.from("jobs").select("name").eq("id", jobId).maybeSingle();
         if (!job) return new Response("Not found", { status: 404 });
 
         let body = "";
@@ -55,8 +50,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
             .eq("job_id", jobId)
             .eq("status", "error")
             .order("domain");
-          body =
-            (data || []).map((r: any) => `${r.domain}\t${r.error || ""}`).join("\n") + "\n";
+          body = (data || []).map((r: any) => `${r.domain}\t${r.error || ""}`).join("\n") + "\n";
           filename = "errors.txt";
         } else if (kind === "events") {
           contentType = "text/tab-separated-values; charset=utf-8";
@@ -137,10 +131,19 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
             if (error || !data || data.length === 0) break;
             for (const r of data as any[]) {
               const info = r.info || {};
-              lines.push([
-                r.domain, r.tld || r.domain.split(".").slice(1).join("."), r.status,
-                info.source || "", info.registrar || "", info.expiresDate || "", r.error || "",
-              ].map(csvEscape).join(","));
+              lines.push(
+                [
+                  r.domain,
+                  r.tld || r.domain.split(".").slice(1).join("."),
+                  r.status,
+                  info.source || "",
+                  info.registrar || "",
+                  info.expiresDate || "",
+                  r.error || "",
+                ]
+                  .map(csvEscape)
+                  .join(","),
+              );
             }
             if (data.length < PAGE) break;
             from += PAGE;
@@ -150,9 +153,7 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
           // all (TSV)
           contentType = "text/tab-separated-values; charset=utf-8";
           filename = "all_results.tsv";
-          const lines = [
-            "domain\tstatus\tregistrar\tcreated\texpires\tnameservers\tsource\terror",
-          ];
+          const lines = ["domain\tstatus\tregistrar\tcreated\texpires\tnameservers\tsource\terror"];
           const PAGE = 1000;
           let from = 0;
           while (true) {
@@ -185,7 +186,6 @@ export const Route = createFileRoute("/api/public/jobs/$jobId/download")({
           }
           body = lines.join("\n") + "\n";
         }
-
 
         return new Response(body, {
           headers: {

@@ -24,23 +24,136 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
 };
 
 const TLD_VALUE: Record<string, number> = {
-  com: 1.0, net: 0.85, org: 0.8, io: 0.78, ai: 0.75,
-  co: 0.7, cn: 0.65, cc: 0.6, xyz: 0.4, app: 0.55, dev: 0.55,
+  com: 1.0,
+  net: 0.85,
+  org: 0.8,
+  io: 0.78,
+  ai: 0.75,
+  co: 0.7,
+  cn: 0.65,
+  cc: 0.6,
+  xyz: 0.4,
+  app: 0.55,
+  dev: 0.55,
 };
 
 // short common english words (cheap heuristic)
 const COMMON_WORDS = new Set([
-  "app","art","ace","bay","bit","box","buy","cap","car","cat","city","club","code","coin","cool",
-  "data","day","dev","dog","dot","easy","eco","edge","eye","fan","fit","fly","fun","game","gear",
-  "gift","go","good","green","group","hat","help","home","hub","idea","inn","jet","job","key",
-  "kid","king","lab","leaf","life","link","list","live","love","map","max","mind","mint","money",
-  "moon","new","note","one","page","park","pay","pet","pic","pin","play","plus","pro","red",
-  "ride","run","sale","save","ship","shop","site","sky","smart","social","soft","star","store",
-  "sun","sure","tax","tech","time","tip","top","trade","trip","truck","try","up","vibe","view",
-  "wave","way","web","win","work","world","yes","zoo","zen","ai","biz","ml","io",
+  "app",
+  "art",
+  "ace",
+  "bay",
+  "bit",
+  "box",
+  "buy",
+  "cap",
+  "car",
+  "cat",
+  "city",
+  "club",
+  "code",
+  "coin",
+  "cool",
+  "data",
+  "day",
+  "dev",
+  "dog",
+  "dot",
+  "easy",
+  "eco",
+  "edge",
+  "eye",
+  "fan",
+  "fit",
+  "fly",
+  "fun",
+  "game",
+  "gear",
+  "gift",
+  "go",
+  "good",
+  "green",
+  "group",
+  "hat",
+  "help",
+  "home",
+  "hub",
+  "idea",
+  "inn",
+  "jet",
+  "job",
+  "key",
+  "kid",
+  "king",
+  "lab",
+  "leaf",
+  "life",
+  "link",
+  "list",
+  "live",
+  "love",
+  "map",
+  "max",
+  "mind",
+  "mint",
+  "money",
+  "moon",
+  "new",
+  "note",
+  "one",
+  "page",
+  "park",
+  "pay",
+  "pet",
+  "pic",
+  "pin",
+  "play",
+  "plus",
+  "pro",
+  "red",
+  "ride",
+  "run",
+  "sale",
+  "save",
+  "ship",
+  "shop",
+  "site",
+  "sky",
+  "smart",
+  "social",
+  "soft",
+  "star",
+  "store",
+  "sun",
+  "sure",
+  "tax",
+  "tech",
+  "time",
+  "tip",
+  "top",
+  "trade",
+  "trip",
+  "truck",
+  "try",
+  "up",
+  "vibe",
+  "view",
+  "wave",
+  "way",
+  "web",
+  "win",
+  "work",
+  "world",
+  "yes",
+  "zoo",
+  "zen",
+  "ai",
+  "biz",
+  "ml",
+  "io",
 ]);
 
-const VOWELS = new Set(["a","e","i","o","u","y"]);
+const VOWELS = new Set(["a", "e", "i", "o", "u", "y"]);
 
 function vowelRatio(s: string) {
   let v = 0;
@@ -49,21 +162,24 @@ function vowelRatio(s: string) {
 }
 
 export type ScoreInputs = {
-  name: string;        // sld (without tld)
-  tld: string;         // without leading dot
+  name: string; // sld (without tld)
+  tld: string; // without leading dot
   archive_year?: number | null;
   backlinks?: number | null;
-  tld_registered_count?: number | null;  // 0..7 typical
+  tld_registered_count?: number | null; // 0..7 typical
   risk_level?: "low" | "medium" | "high" | "unknown" | string | null;
 };
 
 export type ScoreResult = {
-  total: number;       // 0..100
+  total: number; // 0..100
   brandLevel: "S" | "A" | "B" | "C" | "D";
   parts: Record<keyof ScoringWeights, number>;
 };
 
-export function scoreDomain(input: ScoreInputs, weights: ScoringWeights = DEFAULT_WEIGHTS): ScoreResult {
+export function scoreDomain(
+  input: ScoreInputs,
+  weights: ScoringWeights = DEFAULT_WEIGHTS,
+): ScoreResult {
   const name = (input.name ?? "").toLowerCase();
   const tld = (input.tld ?? "").toLowerCase().replace(/^\./, "");
   const len = name.length;
@@ -107,7 +223,15 @@ export function scoreDomain(input: ScoreInputs, weights: ScoringWeights = DEFAUL
   if (input.risk_level === "high") penalty = weights.risk_penalty_max;
   else if (input.risk_level === "medium") penalty = weights.risk_penalty_max / 2;
 
-  const totalRaw = lengthScore + semanticScore + tldScore + archiveScore + blScore + relScore + brandScore - penalty;
+  const totalRaw =
+    lengthScore +
+    semanticScore +
+    tldScore +
+    archiveScore +
+    blScore +
+    relScore +
+    brandScore -
+    penalty;
   const total = Math.max(0, Math.min(100, Math.round(totalRaw)));
 
   const brandLevel: ScoreResult["brandLevel"] =

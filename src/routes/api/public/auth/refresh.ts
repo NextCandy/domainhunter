@@ -19,7 +19,8 @@ export const Route = createFileRoute("/api/public/auth/refresh")({
         if (!parsed.success) return Response.json({ error: "刷新令牌格式错误" }, { status: 400 });
 
         try {
-          const { verifyRefreshToken, findUserById, signToken, signRefreshToken } = await import("@/lib/auth.server");
+          const { verifyRefreshToken, findUserById, signToken, signRefreshToken } =
+            await import("@/lib/auth.server");
           const claims = verifyRefreshToken(parsed.data.refreshToken);
           const user = await findUserById(claims.sub);
           if (!user) return Response.json({ error: "用户不存在或已失效" }, { status: 401 });
@@ -30,7 +31,11 @@ export const Route = createFileRoute("/api/public/auth/refresh")({
           }
 
           const token = signToken({ sub: user.id, email: user.email, ver: currentVersion });
-          const refreshToken = signRefreshToken({ sub: user.id, email: user.email, ver: currentVersion });
+          const refreshToken = signRefreshToken({
+            sub: user.id,
+            email: user.email,
+            ver: currentVersion,
+          });
           return Response.json({ user: { id: user.id, email: user.email }, token, refreshToken });
         } catch {
           return Response.json({ error: "登录状态已过期，请重新登录" }, { status: 401 });

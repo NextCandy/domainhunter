@@ -13,16 +13,25 @@ function AuctionsPage() {
 
   return (
     <AppShell>
-      <PageHeader title="拍卖域名" description="第三方拍卖 / 一口价聚合。GoDaddy · Namecheap · Dynadot · Gname · Sedo · Catched · Efty（API 待接入）" />
+      <PageHeader
+        title="拍卖域名"
+        description="第三方拍卖 / 一口价聚合。GoDaddy · Namecheap · Dynadot · Gname · Sedo · Catched · Efty（API 待接入）"
+      />
       {isLoading ? (
         <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} lines={2} />)}
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} lines={2} />
+          ))}
         </div>
       ) : !data?.length ? (
         <EmptyState
           title="尚未接入任何拍卖平台"
           hint="可在 后台 → 注册商管理 / 数据源 中配置 GoDaddy、Namecheap、Dynadot、Sedo 等平台凭证（本版本仅预留字段）。"
-          action={<Link to="/admin/registrars" className="btn-base btn-primary">前往配置</Link>}
+          action={
+            <Link to="/admin/registrars" className="btn-base btn-primary">
+              前往配置
+            </Link>
+          }
         />
       ) : (
         <div className="card-elev overflow-hidden">
@@ -40,14 +49,30 @@ function AuctionsPage() {
               </thead>
               <tbody>
                 {data.map((a: any) => (
-                  <tr key={a.id} className="border-b border-border last:border-0 hover:bg-accent/40">
+                  <tr
+                    key={a.id}
+                    className="border-b border-border last:border-0 hover:bg-accent/40"
+                  >
                     <td className="px-4 py-2 font-medium">{a.domain}</td>
                     <td className="px-3 py-2 text-muted-foreground">{a.platform}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{a.current_price ?? "—"} {a.currency ?? ""}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{a.bid_count ?? 0}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{a.end_time ? new Date(a.end_time).toLocaleString() : "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {a.current_price ?? "—"} {a.currency ?? ""}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                      {a.bid_count ?? 0}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {a.end_time ? new Date(a.end_time).toLocaleString() : "—"}
+                    </td>
                     <td className="px-4 py-2 text-right">
-                      <a href={a.buy_url ?? "#"} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary hover:underline">前往</a>
+                      <a
+                        href={a.buy_url ?? "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        前往
+                      </a>
                     </td>
                   </tr>
                 ))}

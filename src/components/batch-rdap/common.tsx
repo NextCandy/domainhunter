@@ -1,6 +1,5 @@
 import type * as React from "react";
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
 import type { DomainInfo } from "@/lib/rdap.server";
 import type { RecentJob } from "./types";
 
@@ -36,7 +35,6 @@ export function Header() {
   );
 }
 
-
 export function StatusBadge({ status }: { status: DomainInfo["status"] }) {
   const map: Record<string, { c: string; t: string }> = {
     available: { c: "text-success border-success/40 bg-success/10", t: "未注册" },
@@ -66,7 +64,10 @@ export function LookupResultCard({ domain, info }: { domain: string; info: Domai
         <InfoRow label="注册日" value={info.createdDate} />
         <InfoRow label="到期日" value={info.expiresDate} />
         <InfoRow label="更新日" value={info.updatedDate} />
-        <InfoRow label="DNSSEC" value={info.dnssec ? "是" : info.dnssec === false ? "否" : undefined} />
+        <InfoRow
+          label="DNSSEC"
+          value={info.dnssec ? "是" : info.dnssec === false ? "否" : undefined}
+        />
         <InfoRow label="状态" value={info.statuses?.join(", ")} />
       </div>
       {info.nameservers?.length ? (
@@ -94,7 +95,6 @@ export function InfoRow({ label, value }: { label: string; value?: string }) {
   );
 }
 
-
 export function NumField({
   label,
   value,
@@ -108,8 +108,7 @@ export function NumField({
   hint?: string;
   bounds?: { readonly min: number; readonly max: number };
 }) {
-  const oob =
-    bounds != null && (value < bounds.min || value > bounds.max);
+  const oob = bounds != null && (value < bounds.min || value > bounds.max);
   return (
     <label className="block">
       <div className="text-[11px] text-muted-foreground mb-1 flex items-baseline justify-between gap-2">
@@ -208,13 +207,19 @@ export function RecentList({
       await navigator.clipboard.writeText(text);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
-    } catch {}
+    } catch {
+      // Clipboard writes can be blocked by browser permissions; the button simply stays idle.
+    }
   }
   return (
     <section className="panel p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <button className="btn-base btn-ghost" style={{ padding: "0.25rem 0.625rem", fontSize: "0.7rem" }} onClick={copy}>
+        <button
+          className="btn-base btn-ghost"
+          style={{ padding: "0.25rem 0.625rem", fontSize: "0.7rem" }}
+          onClick={copy}
+        >
           {copied ? "已复制" : "复制列表"}
         </button>
       </div>
@@ -229,53 +234,37 @@ export function RecentJobsList({
   jobs,
   onPick,
   activeId,
-  onDelete,
 }: {
   jobs: RecentJob[];
   onPick: (id: string) => void;
   activeId?: string;
-  onDelete?: (id: string) => void;
 }) {
   return (
     <div className="space-y-1">
       {jobs.map((j) => (
-        <div
+        <button
           key={j.id}
-          className={`flex items-center w-full rounded-md border transition-colors ${
+          onClick={() => {
+            localStorage.setItem(LAST_JOB_KEY, j.id);
+            onPick(j.id);
+          }}
+          className={`w-full text-left p-2 rounded-md border transition-colors ${
             activeId === j.id
               ? "border-primary/50 bg-primary/5"
               : "border-border hover:border-border-strong hover:bg-accent"
           }`}
         >
-          <button
-            onClick={() => {
-              localStorage.setItem(LAST_JOB_KEY, j.id);
-              onPick(j.id);
-            }}
-            className="flex-1 min-w-0 text-left p-2"
-          >
-            <div className="flex items-center justify-between gap-3 mono text-xs">
-              <span className="text-foreground truncate">{j.name}</span>
-              <span className="text-muted-foreground shrink-0">
-                {j.checked}/{j.total} · {j.available} 未注册 · {j.status}
-              </span>
-            </div>
-          </button>
-          {onDelete && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(j.id); }}
-              title="删除任务（含全部查询结果）"
-              className="shrink-0 mr-1.5 grid h-7 w-7 place-items-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
+          <div className="flex items-center justify-between gap-3 mono text-xs">
+            <span className="text-foreground truncate">{j.name}</span>
+            <span className="text-muted-foreground shrink-0">
+              {j.checked}/{j.total} · {j.available} 未注册 · {j.status}
+            </span>
+          </div>
+        </button>
       ))}
     </div>
   );
 }
-
 
 export function ReferenceTable() {
   const rows = [
@@ -317,7 +306,12 @@ export function Footer() {
     <footer className="text-center text-[11px] text-muted-foreground pt-4">
       <p className="mono">
         powered by IANA RDAP bootstrap · WHOIS fallback ·{" "}
-        <a href="https://ym.aiplay.im/" target="_blank" rel="noreferrer" className="underline hover:text-foreground">
+        <a
+          href="https://ym.aiplay.im/"
+          target="_blank"
+          rel="noreferrer"
+          className="underline hover:text-foreground"
+        >
           原站
         </a>
       </p>

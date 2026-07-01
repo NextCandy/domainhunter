@@ -38,24 +38,6 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
-function withFreshHtmlHeaders(request: Request, response: Response): Response {
-  const url = new URL(request.url);
-  const isApi = url.pathname.startsWith("/api/") || url.pathname.includes("/_server");
-  const isAsset = url.pathname.startsWith("/assets/");
-  const contentType = response.headers.get("content-type") ?? "";
-  if (isApi || isAsset || !contentType.includes("text/html")) return response;
-
-  const headers = new Headers(response.headers);
-  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
-  headers.set("Pragma", "no-cache");
-  headers.set("Expires", "0");
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-}
-
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     startWatchlistScheduler();
@@ -67,14 +49,15 @@ export default {
         try {
           const { verifyToken } = await import("./lib/auth.server");
           userId = verifyToken(auth.replace("Bearer ", "").trim()).sub;
-        } catch {}
+        } catch {
+          // Request logging treats invalid or expired tokens as anonymous traffic.
+        }
       }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       const normalized = await normalizeCatastrophicSsrResponse(response);
-      const finalResponse = withFreshHtmlHeaders(request, normalized);
-      logRequest(request, finalResponse.status, Date.now() - startedAt, userId);
-      return finalResponse;
+      logRequest(request, normalized.status, Date.now() - startedAt, userId);
+      return normalized;
     } catch (error) {
       console.error(error);
       logRequest(request, 500, Date.now() - startedAt, userId);
@@ -91,5 +74,7 @@ function logRequest(request: Request, status: number, durationMs: number, userId
   const isApi = url.pathname.startsWith("/api/") || url.pathname.includes("/_server");
   if (!isApi) return;
   const detail = process.env.NODE_ENV === "development" ? ` 用户=${userId ?? "匿名"}` : "";
-  console.info(`[请求日志] ${request.method} ${url.pathname} 状态=${status} 耗时=${durationMs}ms${detail}`);
+  console.info(
+    `[请求日志] ${request.method} ${url.pathname} 状态=${status} 耗时=${durationMs}ms${detail}`,
+  );
 }

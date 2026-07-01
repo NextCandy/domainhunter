@@ -4,7 +4,8 @@ const PREFIX = "aes-256-gcm:v1";
 
 function key() {
   const secret = process.env.JWT_SECRET;
-  if (!secret || secret.length < 16) throw new Error("JWT_SECRET 未配置或长度不足，无法加密服务端密钥");
+  if (!secret || secret.length < 16)
+    throw new Error("JWT_SECRET 未配置或长度不足，无法加密服务端密钥");
   return createHash("sha256").update(secret).digest();
 }
 

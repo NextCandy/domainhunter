@@ -78,9 +78,7 @@ export function AuditLogPanel({ jobId }: { jobId: string }) {
               </span>
               <span className={`chip ${levelTone[ev.level] || ""}`}>{ev.level}</span>
               <span className="mono text-foreground">{ev.event}</span>
-              {ev.message && (
-                <span className="text-muted-foreground truncate">{ev.message}</span>
-              )}
+              {ev.message && <span className="text-muted-foreground truncate">{ev.message}</span>}
               {ev.meta && (
                 <button
                   type="button"
@@ -102,4 +100,3 @@ export function AuditLogPanel({ jobId }: { jobId: string }) {
     </section>
   );
 }
-

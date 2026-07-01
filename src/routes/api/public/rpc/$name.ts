@@ -12,11 +12,18 @@ export const Route = createFileRoute("/api/public/rpc/$name")({
         const token = auth.replace("Bearer ", "").trim();
         const { verifyToken } = await import("@/lib/auth.server");
         let claims;
-        try { claims = verifyToken(token); }
-        catch { return Response.json({ error: "Unauthorized" }, { status: 401 }); }
+        try {
+          claims = verifyToken(token);
+        } catch {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
         let body: any = {};
-        try { body = await request.json(); } catch { /* empty body ok */ }
+        try {
+          body = await request.json();
+        } catch {
+          /* empty body ok */
+        }
 
         if (params.name === "has_role") {
           const { hasRole } = await import("@/lib/auth.server");

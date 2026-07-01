@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  deleteJobFn,
   getJobFn,
   listRecentJobsFn,
   recentItemsFn,
@@ -22,22 +21,6 @@ export function CurrentTask() {
   const requeueErrors = useServerFn(requeueErrorsFn);
   const listRecent = useServerFn(listRecentJobsFn);
   const recentItems = useServerFn(recentItemsFn);
-  const deleteJob = useServerFn(deleteJobFn);
-
-  async function handleDeleteJob(id: string) {
-    try {
-      await deleteJob({ data: { jobId: id } });
-      toast.success("任务已删除");
-      if (jobId === id) {
-        setJobId(null);
-        setJob(null);
-        localStorage.removeItem(LAST_JOB_KEY);
-      }
-      setRecentJobs(((await listRecent()) as RecentJob[]) || []);
-    } catch (e: any) {
-      toast.error(e?.message ?? "删除失败");
-    }
-  }
 
   const [job, setJob] = useState<BatchJob | null>(null);
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
@@ -97,8 +80,12 @@ export function CurrentTask() {
 
         // Recent lists (cheap, paged)
         const [a, e] = await Promise.all([
-          recentItems({ data: { jobId: jobId!, kind: "available", limit: 50 } }) as Promise<RecentJobItem[]>,
-          recentItems({ data: { jobId: jobId!, kind: "error", limit: 50 } }) as Promise<RecentJobItem[]>,
+          recentItems({ data: { jobId: jobId!, kind: "available", limit: 50 } }) as Promise<
+            RecentJobItem[]
+          >,
+          recentItems({ data: { jobId: jobId!, kind: "error", limit: 50 } }) as Promise<
+            RecentJobItem[]
+          >,
         ]);
         if (!cancelled) {
           setAvailList(a || []);
@@ -157,7 +144,7 @@ export function CurrentTask() {
         {recentJobs.length > 0 && (
           <div className="mt-4">
             <div className="text-xs text-muted-foreground mb-2">最近任务</div>
-            <RecentJobsList jobs={recentJobs} onPick={(id) => setJobId(id)} onDelete={handleDeleteJob} />
+            <RecentJobsList jobs={recentJobs} onPick={(id) => setJobId(id)} />
           </div>
         )}
       </section>
@@ -214,7 +201,9 @@ export function CurrentTask() {
               className="btn-base btn-ghost"
               onClick={async () => {
                 try {
-                  const r = (await requeueErrors({ data: { jobId: job.id } })) as { requeued: number };
+                  const r = (await requeueErrors({ data: { jobId: job.id } })) as {
+                    requeued: number;
+                  };
                   toast.success(`已重新排队 ${r.requeued} 个错误项`);
                 } catch (e: any) {
                   toast.error("补扫错误项失败", { description: e?.message });
@@ -257,8 +246,7 @@ export function CurrentTask() {
 
         <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            速度{" "}
-            <span className="mono text-foreground">{speed.toFixed(1)}</span> /s
+            速度 <span className="mono text-foreground">{speed.toFixed(1)}</span> /s
           </span>
           <span className="mono">job id: {job.id.slice(0, 8)}…</span>
         </div>
@@ -283,11 +271,10 @@ export function CurrentTask() {
 
       <AuditLogPanel jobId={job.id} />
 
-
       {recentJobs.length > 1 && (
         <section className="panel p-5 sm:p-6">
           <SectionTitle title="切换任务" />
-          <RecentJobsList jobs={recentJobs} onPick={(id) => setJobId(id)} activeId={job.id} onDelete={handleDeleteJob} />
+          <RecentJobsList jobs={recentJobs} onPick={(id) => setJobId(id)} activeId={job.id} />
         </section>
       )}
     </>

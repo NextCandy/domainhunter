@@ -187,10 +187,25 @@ export function NewTask() {
       }
 
       const params = {
-        format, customPattern, filterType, filterValue, mustLetter, mustDigit,
-        tldSource, customTlds, tldLength,
-        qps, concurrency, perHostQps, limit, maxTotal, timeout, retries,
-        auto_enrich: autoEnrich ? { enabled: true, kinds: autoEnrichKinds, scope: autoEnrichScope } : null,
+        format,
+        customPattern,
+        filterType,
+        filterValue,
+        mustLetter,
+        mustDigit,
+        tldSource,
+        customTlds,
+        tldLength,
+        qps,
+        concurrency,
+        perHostQps,
+        limit,
+        maxTotal,
+        timeout,
+        retries,
+        auto_enrich: autoEnrich
+          ? { enabled: true, kinds: autoEnrichKinds, scope: autoEnrichScope }
+          : null,
       };
       const res = (await create({
         data: { name: taskName.trim() || defaultTaskName(), params, domains: [...all] },
@@ -299,11 +314,19 @@ export function NewTask() {
             </div>
             <div className="flex gap-4 mt-2 text-xs">
               <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={mustLetter} onChange={(e) => setMustLetter(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={mustLetter}
+                  onChange={(e) => setMustLetter(e.target.checked)}
+                />
                 必须包含字母
               </label>
               <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={mustDigit} onChange={(e) => setMustDigit(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={mustDigit}
+                  onChange={(e) => setMustDigit(e.target.checked)}
+                />
                 必须包含数字
               </label>
             </div>
@@ -367,9 +390,25 @@ export function NewTask() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <NumField label="总 QPS" value={qps} setValue={setQps} bounds={LIMITS.qps} />
-            <NumField label="并发数" value={concurrency} setValue={setConcurrency} bounds={LIMITS.concurrency} />
-            <NumField label="单主机 QPS" value={perHostQps} setValue={setPerHostQps} bounds={LIMITS.perHostQps} />
-            <NumField label="测试 limit" value={limit} setValue={setLimit} bounds={LIMITS.limit} hint="0=全量" />
+            <NumField
+              label="并发数"
+              value={concurrency}
+              setValue={setConcurrency}
+              bounds={LIMITS.concurrency}
+            />
+            <NumField
+              label="单主机 QPS"
+              value={perHostQps}
+              setValue={setPerHostQps}
+              bounds={LIMITS.perHostQps}
+            />
+            <NumField
+              label="测试 limit"
+              value={limit}
+              setValue={setLimit}
+              bounds={LIMITS.limit}
+              hint="0=全量"
+            />
             <NumField
               label="安全上限 max_total"
               value={maxTotal}
@@ -378,27 +417,53 @@ export function NewTask() {
               hint="0=不限制"
             />
             <div className="grid grid-cols-2 gap-2">
-              <NumField label="超时(秒)" value={timeout} setValue={setTimeout} bounds={LIMITS.timeoutSec} />
-              <NumField label="重试" value={retries} setValue={setRetries} bounds={LIMITS.retries} />
+              <NumField
+                label="超时(秒)"
+                value={timeout}
+                setValue={setTimeout}
+                bounds={LIMITS.timeoutSec}
+              />
+              <NumField
+                label="重试"
+                value={retries}
+                setValue={setRetries}
+                bounds={LIMITS.retries}
+              />
             </div>
             <div className="mt-3 rounded-md border border-border bg-accent/30 p-2.5">
               <label className="flex items-center gap-2 text-xs font-medium">
-                <input type="checkbox" checked={autoEnrich} onChange={e => setAutoEnrich(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={autoEnrich}
+                  onChange={(e) => setAutoEnrich(e.target.checked)}
+                />
                 完成后自动丰富抓取（DNS / Archive / SEO）
               </label>
               {autoEnrich && (
                 <div className="mt-2 space-y-2 text-xs">
                   <div className="flex flex-wrap gap-2">
-                    {["dns","archive","seo"].map(k => (
+                    {["dns", "archive", "seo"].map((k) => (
                       <label key={k} className="flex items-center gap-1">
-                        <input type="checkbox" checked={autoEnrichKinds.includes(k)}
-                          onChange={e => setAutoEnrichKinds(s => e.target.checked ? [...s, k] : s.filter(x => x !== k))} />
+                        <input
+                          type="checkbox"
+                          checked={autoEnrichKinds.includes(k)}
+                          onChange={(e) =>
+                            setAutoEnrichKinds((s) =>
+                              e.target.checked ? [...s, k] : s.filter((x) => x !== k),
+                            )
+                          }
+                        />
                         {k.toUpperCase()}
                       </label>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2">范围：
-                    <select value={autoEnrichScope} onChange={e => setAutoEnrichScope(e.target.value as any)} className="field text-xs">
+                  <div className="flex items-center gap-2">
+                    范围：
+                    <select
+                      value={autoEnrichScope}
+                      onChange={(e) => setAutoEnrichScope(e.target.value as any)}
+                      className="field text-xs"
+                    >
                       <option value="available">仅可注册</option>
                       <option value="registered">仅已注册</option>
                       <option value="all">全部</option>
@@ -411,12 +476,12 @@ export function NewTask() {
         </div>
       </div>
 
-
       <div className="mt-5 pt-5 border-t border-border flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs">
           {estimate && (
             <span className="mono text-muted-foreground">
-              估算 ≈ <span className="text-foreground">{estimate.total.toLocaleString()}</span> 个域名
+              估算 ≈ <span className="text-foreground">{estimate.total.toLocaleString()}</span>{" "}
+              个域名
               {estimate.capped ? " (估算)" : ""}
             </span>
           )}

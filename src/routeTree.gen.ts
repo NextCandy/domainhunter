@@ -25,6 +25,11 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as ToolsBatchRdapRouteImport } from './routes/tools.batch-rdap'
 import { Route as EnrichIdRouteImport } from './routes/enrich.$id'
 import { Route as DomainsDomainRouteImport } from './routes/domains.$domain'
+import { Route as ApiWatchlistRouteImport } from './routes/api/watchlist'
+import { Route as ApiPortfolioRouteImport } from './routes/api/portfolio'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiDashboardRouteImport } from './routes/api/dashboard'
+import { Route as ApiAlertsRouteImport } from './routes/api/alerts'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTldsRouteImport } from './routes/admin.tlds'
 import { Route as AdminSourcesRouteImport } from './routes/admin.sources'
@@ -34,9 +39,15 @@ import { Route as AdminRegistrarsRouteImport } from './routes/admin.registrars'
 import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
 import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as AdminHistoryRouteImport } from './routes/admin.history'
+import { Route as ApiDomainsSearchRouteImport } from './routes/api/domains/search'
+import { Route as ApiDomainsEnrichRouteImport } from './routes/api/domains/enrich'
+import { Route as ApiDomainsIdRouteImport } from './routes/api/domains/$id'
+import { Route as ApiAiAnalyzeRouteImport } from './routes/api/ai/analyze'
+import { Route as ApiAdminJobsRouteImport } from './routes/api/admin/jobs'
 import { Route as ApiPublicRpcNameRouteImport } from './routes/api/public/rpc/$name'
 import { Route as ApiPublicHooksSyncPricesRouteImport } from './routes/api/public/hooks/sync-prices'
 import { Route as ApiPublicAuthSignupRouteImport } from './routes/api/public/auth/signup'
+import { Route as ApiPublicAuthRefreshRouteImport } from './routes/api/public/auth/refresh'
 import { Route as ApiPublicAuthMeRouteImport } from './routes/api/public/auth/me'
 import { Route as ApiPublicAuthLoginRouteImport } from './routes/api/public/auth/login'
 import { Route as ApiPublicJobsJobIdDownloadRouteImport } from './routes/api/public/jobs/$jobId/download'
@@ -122,6 +133,31 @@ const DomainsDomainRoute = DomainsDomainRouteImport.update({
   path: '/domains/$domain',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWatchlistRoute = ApiWatchlistRouteImport.update({
+  id: '/api/watchlist',
+  path: '/api/watchlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPortfolioRoute = ApiPortfolioRouteImport.update({
+  id: '/api/portfolio',
+  path: '/api/portfolio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardRoute = ApiDashboardRouteImport.update({
+  id: '/api/dashboard',
+  path: '/api/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsRoute = ApiAlertsRouteImport.update({
+  id: '/api/alerts',
+  path: '/api/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -167,6 +203,31 @@ const AdminHistoryRoute = AdminHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiDomainsSearchRoute = ApiDomainsSearchRouteImport.update({
+  id: '/api/domains/search',
+  path: '/api/domains/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDomainsEnrichRoute = ApiDomainsEnrichRouteImport.update({
+  id: '/api/domains/enrich',
+  path: '/api/domains/enrich',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDomainsIdRoute = ApiDomainsIdRouteImport.update({
+  id: '/api/domains/$id',
+  path: '/api/domains/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiAnalyzeRoute = ApiAiAnalyzeRouteImport.update({
+  id: '/api/ai/analyze',
+  path: '/api/ai/analyze',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminJobsRoute = ApiAdminJobsRouteImport.update({
+  id: '/api/admin/jobs',
+  path: '/api/admin/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicRpcNameRoute = ApiPublicRpcNameRouteImport.update({
   id: '/api/public/rpc/$name',
   path: '/api/public/rpc/$name',
@@ -181,6 +242,11 @@ const ApiPublicHooksSyncPricesRoute =
 const ApiPublicAuthSignupRoute = ApiPublicAuthSignupRouteImport.update({
   id: '/api/public/auth/signup',
   path: '/api/public/auth/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicAuthRefreshRoute = ApiPublicAuthRefreshRouteImport.update({
+  id: '/api/public/auth/refresh',
+  path: '/api/public/auth/refresh',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicAuthMeRoute = ApiPublicAuthMeRouteImport.update({
@@ -228,12 +294,23 @@ export interface FileRoutesByFullPath {
   '/admin/sources': typeof AdminSourcesRoute
   '/admin/tlds': typeof AdminTldsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/alerts': typeof ApiAlertsRoute
+  '/api/dashboard': typeof ApiDashboardRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/portfolio': typeof ApiPortfolioRoute
+  '/api/watchlist': typeof ApiWatchlistRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/admin/jobs': typeof ApiAdminJobsRoute
+  '/api/ai/analyze': typeof ApiAiAnalyzeRoute
+  '/api/domains/$id': typeof ApiDomainsIdRoute
+  '/api/domains/enrich': typeof ApiDomainsEnrichRoute
+  '/api/domains/search': typeof ApiDomainsSearchRoute
   '/api/public/auth/login': typeof ApiPublicAuthLoginRoute
   '/api/public/auth/me': typeof ApiPublicAuthMeRoute
+  '/api/public/auth/refresh': typeof ApiPublicAuthRefreshRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
   '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
   '/api/public/rpc/$name': typeof ApiPublicRpcNameRoute
@@ -261,12 +338,23 @@ export interface FileRoutesByTo {
   '/admin/sources': typeof AdminSourcesRoute
   '/admin/tlds': typeof AdminTldsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/alerts': typeof ApiAlertsRoute
+  '/api/dashboard': typeof ApiDashboardRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/portfolio': typeof ApiPortfolioRoute
+  '/api/watchlist': typeof ApiWatchlistRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin': typeof AdminIndexRoute
+  '/api/admin/jobs': typeof ApiAdminJobsRoute
+  '/api/ai/analyze': typeof ApiAiAnalyzeRoute
+  '/api/domains/$id': typeof ApiDomainsIdRoute
+  '/api/domains/enrich': typeof ApiDomainsEnrichRoute
+  '/api/domains/search': typeof ApiDomainsSearchRoute
   '/api/public/auth/login': typeof ApiPublicAuthLoginRoute
   '/api/public/auth/me': typeof ApiPublicAuthMeRoute
+  '/api/public/auth/refresh': typeof ApiPublicAuthRefreshRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
   '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
   '/api/public/rpc/$name': typeof ApiPublicRpcNameRoute
@@ -296,12 +384,23 @@ export interface FileRoutesById {
   '/admin/sources': typeof AdminSourcesRoute
   '/admin/tlds': typeof AdminTldsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/api/alerts': typeof ApiAlertsRoute
+  '/api/dashboard': typeof ApiDashboardRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/portfolio': typeof ApiPortfolioRoute
+  '/api/watchlist': typeof ApiWatchlistRoute
   '/domains/$domain': typeof DomainsDomainRoute
   '/enrich/$id': typeof EnrichIdRoute
   '/tools/batch-rdap': typeof ToolsBatchRdapRoute
   '/admin/': typeof AdminIndexRoute
+  '/api/admin/jobs': typeof ApiAdminJobsRoute
+  '/api/ai/analyze': typeof ApiAiAnalyzeRoute
+  '/api/domains/$id': typeof ApiDomainsIdRoute
+  '/api/domains/enrich': typeof ApiDomainsEnrichRoute
+  '/api/domains/search': typeof ApiDomainsSearchRoute
   '/api/public/auth/login': typeof ApiPublicAuthLoginRoute
   '/api/public/auth/me': typeof ApiPublicAuthMeRoute
+  '/api/public/auth/refresh': typeof ApiPublicAuthRefreshRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
   '/api/public/hooks/sync-prices': typeof ApiPublicHooksSyncPricesRoute
   '/api/public/rpc/$name': typeof ApiPublicRpcNameRoute
@@ -332,12 +431,23 @@ export interface FileRouteTypes {
     | '/admin/sources'
     | '/admin/tlds'
     | '/admin/users'
+    | '/api/alerts'
+    | '/api/dashboard'
+    | '/api/health'
+    | '/api/portfolio'
+    | '/api/watchlist'
     | '/domains/$domain'
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin/'
+    | '/api/admin/jobs'
+    | '/api/ai/analyze'
+    | '/api/domains/$id'
+    | '/api/domains/enrich'
+    | '/api/domains/search'
     | '/api/public/auth/login'
     | '/api/public/auth/me'
+    | '/api/public/auth/refresh'
     | '/api/public/auth/signup'
     | '/api/public/hooks/sync-prices'
     | '/api/public/rpc/$name'
@@ -365,12 +475,23 @@ export interface FileRouteTypes {
     | '/admin/sources'
     | '/admin/tlds'
     | '/admin/users'
+    | '/api/alerts'
+    | '/api/dashboard'
+    | '/api/health'
+    | '/api/portfolio'
+    | '/api/watchlist'
     | '/domains/$domain'
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin'
+    | '/api/admin/jobs'
+    | '/api/ai/analyze'
+    | '/api/domains/$id'
+    | '/api/domains/enrich'
+    | '/api/domains/search'
     | '/api/public/auth/login'
     | '/api/public/auth/me'
+    | '/api/public/auth/refresh'
     | '/api/public/auth/signup'
     | '/api/public/hooks/sync-prices'
     | '/api/public/rpc/$name'
@@ -399,12 +520,23 @@ export interface FileRouteTypes {
     | '/admin/sources'
     | '/admin/tlds'
     | '/admin/users'
+    | '/api/alerts'
+    | '/api/dashboard'
+    | '/api/health'
+    | '/api/portfolio'
+    | '/api/watchlist'
     | '/domains/$domain'
     | '/enrich/$id'
     | '/tools/batch-rdap'
     | '/admin/'
+    | '/api/admin/jobs'
+    | '/api/ai/analyze'
+    | '/api/domains/$id'
+    | '/api/domains/enrich'
+    | '/api/domains/search'
     | '/api/public/auth/login'
     | '/api/public/auth/me'
+    | '/api/public/auth/refresh'
     | '/api/public/auth/signup'
     | '/api/public/hooks/sync-prices'
     | '/api/public/rpc/$name'
@@ -425,10 +557,21 @@ export interface RootRouteChildren {
   PendingRoute: typeof PendingRoute
   PricingRoute: typeof PricingRoute
   WatchlistRoute: typeof WatchlistRoute
+  ApiAlertsRoute: typeof ApiAlertsRoute
+  ApiDashboardRoute: typeof ApiDashboardRoute
+  ApiHealthRoute: typeof ApiHealthRoute
+  ApiPortfolioRoute: typeof ApiPortfolioRoute
+  ApiWatchlistRoute: typeof ApiWatchlistRoute
   DomainsDomainRoute: typeof DomainsDomainRoute
   ToolsBatchRdapRoute: typeof ToolsBatchRdapRoute
+  ApiAdminJobsRoute: typeof ApiAdminJobsRoute
+  ApiAiAnalyzeRoute: typeof ApiAiAnalyzeRoute
+  ApiDomainsIdRoute: typeof ApiDomainsIdRoute
+  ApiDomainsEnrichRoute: typeof ApiDomainsEnrichRoute
+  ApiDomainsSearchRoute: typeof ApiDomainsSearchRoute
   ApiPublicAuthLoginRoute: typeof ApiPublicAuthLoginRoute
   ApiPublicAuthMeRoute: typeof ApiPublicAuthMeRoute
+  ApiPublicAuthRefreshRoute: typeof ApiPublicAuthRefreshRoute
   ApiPublicAuthSignupRoute: typeof ApiPublicAuthSignupRoute
   ApiPublicHooksSyncPricesRoute: typeof ApiPublicHooksSyncPricesRoute
   ApiPublicRpcNameRoute: typeof ApiPublicRpcNameRoute
@@ -550,6 +693,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DomainsDomainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/watchlist': {
+      id: '/api/watchlist'
+      path: '/api/watchlist'
+      fullPath: '/api/watchlist'
+      preLoaderRoute: typeof ApiWatchlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/portfolio': {
+      id: '/api/portfolio'
+      path: '/api/portfolio'
+      fullPath: '/api/portfolio'
+      preLoaderRoute: typeof ApiPortfolioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard': {
+      id: '/api/dashboard'
+      path: '/api/dashboard'
+      fullPath: '/api/dashboard'
+      preLoaderRoute: typeof ApiDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alerts': {
+      id: '/api/alerts'
+      path: '/api/alerts'
+      fullPath: '/api/alerts'
+      preLoaderRoute: typeof ApiAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -613,6 +791,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHistoryRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/domains/search': {
+      id: '/api/domains/search'
+      path: '/api/domains/search'
+      fullPath: '/api/domains/search'
+      preLoaderRoute: typeof ApiDomainsSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/domains/enrich': {
+      id: '/api/domains/enrich'
+      path: '/api/domains/enrich'
+      fullPath: '/api/domains/enrich'
+      preLoaderRoute: typeof ApiDomainsEnrichRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/domains/$id': {
+      id: '/api/domains/$id'
+      path: '/api/domains/$id'
+      fullPath: '/api/domains/$id'
+      preLoaderRoute: typeof ApiDomainsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai/analyze': {
+      id: '/api/ai/analyze'
+      path: '/api/ai/analyze'
+      fullPath: '/api/ai/analyze'
+      preLoaderRoute: typeof ApiAiAnalyzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/jobs': {
+      id: '/api/admin/jobs'
+      path: '/api/admin/jobs'
+      fullPath: '/api/admin/jobs'
+      preLoaderRoute: typeof ApiAdminJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/rpc/$name': {
       id: '/api/public/rpc/$name'
       path: '/api/public/rpc/$name'
@@ -632,6 +845,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/auth/signup'
       fullPath: '/api/public/auth/signup'
       preLoaderRoute: typeof ApiPublicAuthSignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/auth/refresh': {
+      id: '/api/public/auth/refresh'
+      path: '/api/public/auth/refresh'
+      fullPath: '/api/public/auth/refresh'
+      preLoaderRoute: typeof ApiPublicAuthRefreshRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/auth/me': {
@@ -717,10 +937,21 @@ const rootRouteChildren: RootRouteChildren = {
   PendingRoute: PendingRoute,
   PricingRoute: PricingRoute,
   WatchlistRoute: WatchlistRoute,
+  ApiAlertsRoute: ApiAlertsRoute,
+  ApiDashboardRoute: ApiDashboardRoute,
+  ApiHealthRoute: ApiHealthRoute,
+  ApiPortfolioRoute: ApiPortfolioRoute,
+  ApiWatchlistRoute: ApiWatchlistRoute,
   DomainsDomainRoute: DomainsDomainRoute,
   ToolsBatchRdapRoute: ToolsBatchRdapRoute,
+  ApiAdminJobsRoute: ApiAdminJobsRoute,
+  ApiAiAnalyzeRoute: ApiAiAnalyzeRoute,
+  ApiDomainsIdRoute: ApiDomainsIdRoute,
+  ApiDomainsEnrichRoute: ApiDomainsEnrichRoute,
+  ApiDomainsSearchRoute: ApiDomainsSearchRoute,
   ApiPublicAuthLoginRoute: ApiPublicAuthLoginRoute,
   ApiPublicAuthMeRoute: ApiPublicAuthMeRoute,
+  ApiPublicAuthRefreshRoute: ApiPublicAuthRefreshRoute,
   ApiPublicAuthSignupRoute: ApiPublicAuthSignupRoute,
   ApiPublicHooksSyncPricesRoute: ApiPublicHooksSyncPricesRoute,
   ApiPublicRpcNameRoute: ApiPublicRpcNameRoute,
@@ -730,3 +961,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -101,8 +101,12 @@ export type AppUser = {
   created_at: string;
 };
 
-export async function findUserByEmail(email: string): Promise<(AppUser & { password_hash: string | null }) | null> {
-  const { rows } = await query<AppUser & { password_hash: string | null; refresh_token_version?: number }>(
+export async function findUserByEmail(
+  email: string,
+): Promise<(AppUser & { password_hash: string | null }) | null> {
+  const { rows } = await query<
+    AppUser & { password_hash: string | null; refresh_token_version?: number }
+  >(
     `SELECT id, email, display_name, created_at, password_hash, COALESCE(refresh_token_version, 0) AS refresh_token_version FROM public.app_users WHERE email = $1 LIMIT 1`,
     [email],
   );
@@ -117,7 +121,11 @@ export async function findUserById(id: string): Promise<AppUser | null> {
   return rows[0] ?? null;
 }
 
-export async function createUser(email: string, password: string, displayName?: string): Promise<AppUser> {
+export async function createUser(
+  email: string,
+  password: string,
+  displayName?: string,
+): Promise<AppUser> {
   const hash = await hashPassword(password);
   const { rows } = await query<AppUser>(
     `INSERT INTO public.app_users (email, password_hash, display_name)

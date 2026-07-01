@@ -3,8 +3,39 @@
 
 import type { DomainIdea, IdeaGenParams } from "./types";
 
-const PREFIXES = ["get", "try", "use", "go", "my", "the", "hi", "open", "smart", "neo", "zen", "pro", "co", "in", "up"];
-const SUFFIXES = ["ly", "io", "hq", "ify", "hub", "lab", "kit", "box", "now", "go", "x", "ai", "pro", "app"];
+const PREFIXES = [
+  "get",
+  "try",
+  "use",
+  "go",
+  "my",
+  "the",
+  "hi",
+  "open",
+  "smart",
+  "neo",
+  "zen",
+  "pro",
+  "co",
+  "in",
+  "up",
+];
+const SUFFIXES = [
+  "ly",
+  "io",
+  "hq",
+  "ify",
+  "hub",
+  "lab",
+  "kit",
+  "box",
+  "now",
+  "go",
+  "x",
+  "ai",
+  "pro",
+  "app",
+];
 const TLD_DEFAULT = ["com", "net", "io", "ai", "app", "co", "cc", "xyz"];
 
 function clean(s: string) {
@@ -28,9 +59,15 @@ function scoreBrand(name: string, strategy: string) {
 }
 
 function ruleBased(params: IdeaGenParams): DomainIdea[] {
-  const kws = params.keywords.split(/[\s,，、]+/).map(clean).filter(Boolean).slice(0, 5);
+  const kws = params.keywords
+    .split(/[\s,，、]+/)
+    .map(clean)
+    .filter(Boolean)
+    .slice(0, 5);
   const base = kws[0] || "brand";
-  const tlds = (params.tlds && params.tlds.length ? params.tlds : TLD_DEFAULT).map(t => t.replace(/^\./, "").toLowerCase());
+  const tlds = (params.tlds && params.tlds.length ? params.tlds : TLD_DEFAULT).map((t) =>
+    t.replace(/^\./, "").toLowerCase(),
+  );
   const min = params.minLen ?? 3;
   const max = params.maxLen ?? 14;
   const count = Math.min(30, Math.max(5, params.count ?? 12));
@@ -39,14 +76,43 @@ function ruleBased(params: IdeaGenParams): DomainIdea[] {
 
   const candidates: Array<{ name: string; strategy: string; reason: string; useCase: string }> = [];
 
-  for (const k of kws) candidates.push({ name: k, strategy: "exact", reason: "完全匹配关键词", useCase: "品牌主站" });
-  for (const p of PREFIXES) candidates.push({ name: p + base, strategy: "prefix", reason: `前缀 ${p}+ 关键词`, useCase: "SaaS / 工具站" });
-  for (const s of SUFFIXES) candidates.push({ name: base + s, strategy: "suffix", reason: `关键词 + 后缀 ${s}`, useCase: "工具 / 应用" });
+  for (const k of kws)
+    candidates.push({ name: k, strategy: "exact", reason: "完全匹配关键词", useCase: "品牌主站" });
+  for (const p of PREFIXES)
+    candidates.push({
+      name: p + base,
+      strategy: "prefix",
+      reason: `前缀 ${p}+ 关键词`,
+      useCase: "SaaS / 工具站",
+    });
+  for (const s of SUFFIXES)
+    candidates.push({
+      name: base + s,
+      strategy: "suffix",
+      reason: `关键词 + 后缀 ${s}`,
+      useCase: "工具 / 应用",
+    });
   if (kws.length >= 2) {
-    candidates.push({ name: kws[0] + kws[1], strategy: "compose", reason: "关键词组合", useCase: "品牌站" });
-    candidates.push({ name: kws[1] + kws[0], strategy: "compose", reason: "关键词反向组合", useCase: "品牌站" });
+    candidates.push({
+      name: kws[0] + kws[1],
+      strategy: "compose",
+      reason: "关键词组合",
+      useCase: "品牌站",
+    });
+    candidates.push({
+      name: kws[1] + kws[0],
+      strategy: "compose",
+      reason: "关键词反向组合",
+      useCase: "品牌站",
+    });
   }
-  for (const k of kws) candidates.push({ name: k + "hq", strategy: "brand", reason: "品牌化短名", useCase: "公司主站" });
+  for (const k of kws)
+    candidates.push({
+      name: k + "hq",
+      strategy: "brand",
+      reason: "品牌化短名",
+      useCase: "公司主站",
+    });
 
   for (const c of candidates) {
     if (c.name.length < min || c.name.length > max) continue;
@@ -72,13 +138,13 @@ function ruleBased(params: IdeaGenParams): DomainIdea[] {
     }
     if (out.length >= count) break;
   }
-  return out.sort((a, b) => (b.memorability + b.brandability) - (a.memorability + a.brandability));
+  return out.sort((a, b) => b.memorability + b.brandability - (a.memorability + a.brandability));
 }
 
 async function aiGenerate(params: IdeaGenParams, apiKey: string): Promise<DomainIdea[]> {
-  const tlds = (params.tlds?.length ? params.tlds : TLD_DEFAULT).map(t => t.replace(/^\./, ""));
-  const baseUrl = (process.env.AI_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
-  const model = process.env.AI_MODEL || "deepseek-v4-flash";
+  const tlds = (params.tlds?.length ? params.tlds : TLD_DEFAULT).map((t) => t.replace(/^\./, ""));
+  const baseUrl = (process.env.AI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const model = process.env.AI_MODEL || "gpt-4o-mini";
   const sys = `你是域名命名专家。根据用户需求生成域名候选。只输出 JSON 数组，不要额外文字。每项 schema:
 {"domain":string,"name":string,"tld":string,"length":number,"reason":string,"useCase":string,"memorability":number,"brandability":number,"recommend":boolean,"strategy":string}
 规则: 名称尽量短(${params.minLen ?? 3}-${params.maxLen ?? 14}字符)、好记、避免连字符、避免已知大品牌近似、memorability/brandability 在 0-100。`;
@@ -90,37 +156,37 @@ async function aiGenerate(params: IdeaGenParams, apiKey: string): Promise<Domain
 数量: ${Math.min(30, Math.max(5, params.count ?? 12))}`;
 
   const resp = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: sys },
-          { role: "user", content: user },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
     throw new Error(`AI 请求失败：HTTP ${resp.status}${text ? `，${text.slice(0, 200)}` : ""}`);
   }
-  const json = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const json = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const content = json.choices?.[0]?.message?.content ?? "";
   const match = content.match(/\[[\s\S]*\]/);
   const raw = match ? match[0] : content;
   const parsed = JSON.parse(raw) as DomainIdea[] | { ideas: DomainIdea[] };
   const arr = Array.isArray(parsed) ? parsed : (parsed.ideas ?? []);
   return arr
-    .filter(x => x && typeof x.domain === "string")
-    .map(x => ({
+    .filter((x) => x && typeof x.domain === "string")
+    .map((x) => ({
       domain: x.domain.toLowerCase(),
       name: x.name?.toLowerCase() ?? x.domain.split(".")[0],
       tld: x.tld?.toLowerCase() ?? x.domain.split(".").slice(1).join("."),
-      length: x.length ?? (x.name?.length ?? 0),
+      length: x.length ?? x.name?.length ?? 0,
       reason: x.reason ?? "",
       useCase: x.useCase ?? "",
       memorability: Math.max(0, Math.min(100, Number(x.memorability) || 60)),

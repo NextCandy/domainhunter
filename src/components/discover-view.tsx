@@ -1,16 +1,50 @@
-// Shared Discover view used by /discover, /deleted, /pending.
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { Filter, RefreshCw, Search, Sparkles, X, Download, RotateCw, SkipForward, Zap, Activity, Settings2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  Database,
+  Filter,
+  Loader2,
+  RefreshCw,
+  Search,
+  Sparkles,
+  Upload,
+  X,
+  Zap,
+} from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import { AppShell, PageHeader } from "@/components/app-shell";
+import { AppShell, PageHeader, StatCard } from "@/components/app-shell";
 import { FilterPanel, DomainTable, type DomainRow } from "@/components/domain-table";
-import { discoverFn, toggleWatchFn, refreshDomainFn, liveScanFn, getTldListFn, deleteDomainsFn, type DiscoverFilters } from "@/lib/discover.functions";
+import {
+  applyTerminalFilters,
+  enrichTerminalRow,
+  formatCompactCurrency,
+  formatCurrency,
+  generateMockDomains,
+  pageRows,
+  type TerminalFilters,
+} from "@/lib/domain-terminal";
+import {
+  discoverFn,
+  toggleWatchFn,
+  refreshDomainFn,
+  liveScanFn,
+  getTldListFn,
+  type DiscoverFilters,
+} from "@/lib/discover.functions";
 import { createEnrichJobFn } from "@/lib/enrich-jobs.functions";
-import { lookupDomainFn, runJobBatchFn, requeueErrorsFn, jobProgressFn, recentItemsFn } from "@/lib/rdap.functions";
+import { runJobBatchFn, jobProgressFn, requeueErrorsFn, recentItemsFn } from "@/lib/rdap.functions";
 import { toast } from "sonner";
 
-const BASE: DiscoverFilters = { page: 1, pageSize: 50, sortBy: "score", sortDir: "desc" };
+const BASE: TerminalFilters = {
+  page: 1,
+  pageSize: 50,
+  sortBy: "score",
+  sortDir: "desc",
+  view: "cards",
+  minLength: 4,
+  maxLength: 20,
+};
 
 type ProgressState = {
   jobId: string;
@@ -22,234 +56,277 @@ type ProgressState = {
   status: string;
   errorSamples: { domain: string; error: string }[];
   startedAt: number;
-  paused: boolean;
+};
+
+type BatchResult = { remaining?: number; processed?: number };
+type JobProgressResult = {
+  job: {
+    checked?: number;
+    available?: number;
+    registered?: number;
+    errors?: number;
+    status: string;
+  };
+  errors: { domain: string; error: string }[];
 };
 
 export function DiscoverView({
   title,
   description,
   presetStatuses,
+  initialQuery,
 }: {
   title: string;
   description?: string;
   presetStatuses?: string[];
+  initialQuery?: string;
 }) {
-  const [filters, setFilters] = useState<DiscoverFilters>({
+  const [filters, setFilters] = useState<TerminalFilters>({
     ...BASE,
+    q: initialQuery,
     statuses: presetStatuses,
   });
+  const debouncedFilters = useDebouncedValue(filters, 220);
   const [mobileFilters, setMobileFilters] = useState(false);
   const [progress, setProgress] = useState<ProgressState | null>(null);
-  const pausedRef = useRef(false);
-
-  // ── 可配置扫描策略（实时生效） ──
-  const [strategy, setStrategy] = useState({ batchSize: 10, pauseMs: 600, maxRetries: 2, timeoutMs: 30000 });
-  const strategyRef = useRef(strategy);
-  useEffect(() => { strategyRef.current = strategy; }, [strategy]);
-
-  // ── Single-domain quick lookup ──
   const [quickDomain, setQuickDomain] = useState("");
-  const [quickResult, setQuickResult] = useState<any | null>(null);
-  const quickLookup = useMutation({
-    mutationFn: (d: string) => lookupDomainFn({ data: { domain: d } }),
-    onSuccess: (r, d) => {
-      setQuickResult(r);
-      const tag = (r as any).status === "available" ? "可注册" :
-                  (r as any).status === "registered" ? "已注册" :
-                  (r as any).status === "error" ? "查询失败" : (r as any).status;
-      toast.success(`${d} · ${tag}`);
-    },
-    onError: (e: any) => { setQuickResult({ status: "error", error: e?.message }); toast.error(e?.message ?? "查询失败"); },
-  });
+  const nav = useNavigate();
 
-  // ── RDAP 连通性 / 限流测试 ──
-  const [pingDomain, setPingDomain] = useState("example.com");
-  const [pingResult, setPingResult] = useState<{
-    ok: boolean; status: string; latencyMs: number; rateLimited: boolean; source?: string; error?: string;
-  } | null>(null);
-  const pingTest = useMutation({
-    mutationFn: async (d: string) => {
-      const t0 = performance.now();
-      try {
-        const r: any = await lookupDomainFn({ data: { domain: d } });
-        const latencyMs = Math.round(performance.now() - t0);
-        const err = (r.error ?? "").toString().toLowerCase();
-        const rateLimited = /429|rate.?limit|too many/.test(err);
-        return {
-          ok: r.status !== "error",
-          status: r.status, latencyMs, rateLimited,
-          source: r.source, error: r.error,
-        };
-      } catch (e: any) {
-        const latencyMs = Math.round(performance.now() - t0);
-        const msg = e?.message ?? "网络错误";
-        return { ok: false, status: "error", latencyMs, rateLimited: /429|rate.?limit/i.test(msg), error: msg };
-      }
-    },
-    onSuccess: (r) => {
-      setPingResult(r);
-      if (r.rateLimited) toast.error(`已被限流（${r.latencyMs}ms），建议调高批间隔`);
-      else if (r.ok) toast.success(`RDAP 正常 · ${r.latencyMs}ms · ${r.source ?? ""}`);
-      else toast.error(`RDAP 异常：${r.error ?? r.status}`);
-    },
-  });
+  const mockRows = useMemo(() => generateMockDomains(5000), []);
+  const serverFilters = useMemo(() => toServerFilters(debouncedFilters), [debouncedFilters]);
 
-  const { data, isFetching, refetch } = useQuery({
-    queryKey: ["discover", filters],
-    queryFn: () => discoverFn({ data: filters }),
+  const query = useQuery({
+    queryKey: ["discover", serverFilters],
+    queryFn: () => discoverFn({ data: serverFilters }),
     placeholderData: (prev) => prev,
+    retry: 1,
   });
 
-  // 后台可配置的 TLD 列表 — 进入页面/窗口聚焦/每 30s 自动刷新
   const { data: tldData } = useQuery({
     queryKey: ["tld-list"],
     queryFn: () => getTldListFn(),
     staleTime: 10_000,
-    refetchOnMount: "always",
     refetchOnWindowFocus: true,
     refetchInterval: 30_000,
   });
 
+  const dbRows = useMemo(
+    () =>
+      ((query.data?.rows ?? []) as Array<Partial<DomainRow> & { domain: string }>).map((r, i) =>
+        enrichTerminalRow(r, i),
+      ),
+    [query.data?.rows],
+  );
+  const useMock = query.isError || dbRows.length === 0;
+  const sourceRows = useMock ? mockRows : dbRows;
+  const filteredRows = useMemo(
+    () => applyTerminalFilters(sourceRows, debouncedFilters),
+    [sourceRows, debouncedFilters],
+  );
+  const visibleRows = useMemo(
+    () => pageRows(filteredRows, filters.page, filters.pageSize),
+    [filteredRows, filters.page, filters.pageSize],
+  );
+  const totals = useMemo(() => summarize(filteredRows), [filteredRows]);
+
+  useEffect(() => {
+    if (query.isError) toast.error("真实数据接口暂不可用，已切换到本地 mock 数据");
+  }, [query.isError]);
+
   const watchMut = useMutation({
-    mutationFn: (d: DomainRow) => toggleWatchFn({ data: { domain: d.domain } }),
-    onSuccess: (r) => toast.success(r.watching ? "已加入观察列表" : "已从观察列表移除"),
-    onError: (e: any) => toast.error(e?.message ?? "操作失败"),
+    mutationFn: async (d: DomainRow) => {
+      try {
+        return await toggleWatchFn({ data: { domain: d.domain } });
+      } catch {
+        const res = await fetch("/api/watchlist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ domain: d.domain, tags: ["hunt"], note: "Mock fallback watch" }),
+        });
+        if (!res.ok) throw new Error("加入观察失败");
+        return { watching: true, mode: "mock" };
+      }
+    },
+    onSuccess: (r) =>
+      toast.success(
+        r.watching ? `已加入观察列表${"mode" in r ? "（mock fallback）" : ""}` : "已从观察列表移除",
+      ),
+    onError: (e: unknown) => toast.error(messageOf(e, "操作失败")),
   });
 
   const refreshMut = useMutation({
     mutationFn: (d: DomainRow) => refreshDomainFn({ data: { domain: d.domain } }),
-    onSuccess: (r) => { toast.success(`${r.domain} · ${r.status} · 评分 ${r.score}`); refetch(); },
-    onError: (e: any) => toast.error(e?.message ?? "刷新失败"),
+    onSuccess: (r) => {
+      toast.success(`${r.domain} · ${r.status} · 评分 ${r.score}`);
+      query.refetch();
+    },
+    onError: (e: unknown) => toast.error(messageOf(e, "刷新失败")),
   });
-
-  const deleteMut = useMutation({
-    mutationFn: (domains: string[]) => deleteDomainsFn({ data: { domains } }),
-    onSuccess: (r) => { toast.success(`已删除 ${r.deleted} 个域名`); refetch(); },
-    onError: (e: any) => toast.error(e?.message ?? "删除失败"),
-  });
-
-  const nav = useNavigate();
 
   const enrichOne = useMutation({
     mutationFn: (d: DomainRow) =>
       createEnrichJobFn({
-        data: { name: `Enrich ${d.domain}`, domains: [d.domain], kinds: ["dns", "archive", "seo"], scope: "single" },
+        data: {
+          name: `Enrich ${d.domain}`,
+          domains: [d.domain],
+          kinds: ["dns", "archive", "seo"],
+          scope: "hunt",
+        },
       }),
-    onSuccess: (r) => { toast.success("已创建丰富任务，跳转中…"); nav({ to: "/enrich/$id", params: { id: r.id } }); },
-    onError: (e: any) => toast.error(e?.message ?? "创建丰富任务失败"),
+    onSuccess: (r) => {
+      toast.success("已创建丰富任务，跳转中");
+      nav({ to: "/enrich/$id", params: { id: r.id } });
+    },
+    onError: (e: unknown) => toast.error(messageOf(e, "创建丰富任务失败")),
   });
 
   const enrichBulk = useMutation({
     mutationFn: () => {
-      const domains = (data?.rows ?? []).map((r: any) => r.domain).slice(0, 500);
+      const domains = filteredRows.slice(0, 500).map((r) => r.domain);
       if (!domains.length) throw new Error("当前结果为空");
       return createEnrichJobFn({
-        data: { name: `Enrich 当前结果 ${domains.length} 个`, domains, kinds: ["dns", "archive", "seo"], scope: "discover" },
+        data: {
+          name: `Enrich 当前 Hunt 结果 ${domains.length} 个`,
+          domains,
+          kinds: ["dns", "archive", "seo"],
+          scope: "hunt",
+        },
       });
     },
-    onSuccess: (r) => { toast.success(`已创建丰富任务（${r.total} 子任务），跳转中…`); nav({ to: "/enrich/$id", params: { id: r.id } }); },
-    onError: (e: any) => toast.error(e?.message ?? "创建丰富任务失败"),
+    onSuccess: (r) => {
+      toast.success(`已创建丰富任务（${r.total} 子任务）`);
+      nav({ to: "/enrich/$id", params: { id: r.id } });
+    },
+    onError: (e: unknown) => toast.error(messageOf(e, "创建丰富任务失败")),
   });
 
-  // ── Live RDAP scan with progress + queue (drives runJobBatchFn) ──
   const liveScan = useMutation({
-    mutationFn: () => liveScanFn({
-      data: {
-        tlds: filters.tlds ?? [],
-        q: filters.q, startsWith: filters.startsWith, endsWith: filters.endsWith, contains: filters.contains,
-        limit: 200,
-      },
-    }),
+    mutationFn: () =>
+      liveScanFn({
+        data: {
+          tlds: filters.tlds?.length ? filters.tlds : ["com", "net", "org", "io", "ai", "do"],
+          q: quickDomain || filters.q,
+          startsWith: filters.startsWith,
+          endsWith: filters.endsWith,
+          contains: filters.contains,
+          limit: 200,
+        },
+      }),
     onSuccess: ({ jobId, total }) => {
-      pausedRef.current = false;
       setProgress({
-        jobId, total, done: 0, available: 0, registered: 0, errors: 0,
-        status: "running", errorSamples: [], startedAt: Date.now(), paused: false,
+        jobId,
+        total,
+        done: 0,
+        available: 0,
+        registered: 0,
+        errors: 0,
+        status: "running",
+        errorSamples: [],
+        startedAt: Date.now(),
       });
-      toast.success(`已创建任务 · ${total} 个域名，开始 RDAP 扫描`);
+      toast.success(`已创建实时扫描任务：${total} 个候选`);
       runQueue(jobId);
     },
-    onError: (e: any) => toast.error(e?.message ?? "创建实时任务失败"),
+    onError: (e: unknown) => toast.error(messageOf(e, "创建实时任务失败")),
   });
 
-  // 队列驱动：分批调用 runJobBatchFn，限速 + 进度（使用 strategyRef 的实时值）
   async function runQueue(jobId: string) {
     let consecutiveErrors = 0;
-    let waitMs = strategyRef.current.pauseMs;
-    while (!pausedRef.current) {
-      const s = strategyRef.current;
+    while (true) {
       try {
-        const res: any = await runJobBatchFn({ data: { jobId, batchSize: s.batchSize, retries: s.maxRetries, timeoutMs: s.timeoutMs } });
-        const p: any = await jobProgressFn({ data: { jobId } });
+        const res = (await runJobBatchFn({
+          data: { jobId, batchSize: 10, retries: 2, timeoutMs: 30000 },
+        })) as BatchResult;
+        const p = (await jobProgressFn({ data: { jobId } })) as JobProgressResult;
         const job = p.job;
-        setProgress((prev) => prev && {
-          ...prev,
-          done: job.checked ?? 0, available: job.available ?? 0,
-          registered: job.registered ?? 0, errors: job.errors ?? 0,
-          status: job.status, errorSamples: p.errors,
-        });
-        if (res?.remaining === 0 || res?.processed === 0 || job.status === "completed" || job.status === "stopped") {
-          setProgress((prev) => prev && { ...prev, status: job.status === "stopped" ? "stopped" : "completed" });
-          // 清掉状态预设，让实时扫描得到的 available/registered 都能在列表里显示
-          setFilters((f) => ({ ...f, statuses: undefined, page: 1 }));
-          refetch();
+        setProgress(
+          (prev) =>
+            prev && {
+              ...prev,
+              done: job.checked ?? 0,
+              available: job.available ?? 0,
+              registered: job.registered ?? 0,
+              errors: job.errors ?? 0,
+              status: job.status,
+              errorSamples: p.errors,
+            },
+        );
+        if (
+          res?.remaining === 0 ||
+          res?.processed === 0 ||
+          job.status === "completed" ||
+          job.status === "stopped"
+        ) {
+          setProgress(
+            (prev) =>
+              prev && { ...prev, status: job.status === "stopped" ? "stopped" : "completed" },
+          );
+          query.refetch();
           break;
         }
-        consecutiveErrors = 0;
-        waitMs = s.pauseMs;
-        await sleep(waitMs);
-      } catch (e: any) {
+        await sleep(650);
+      } catch (e: unknown) {
         consecutiveErrors++;
-        waitMs = Math.min(8000, Math.max(waitMs, s.pauseMs) * 2);
-        toast.error(`批次失败（${consecutiveErrors}）：${e?.message ?? "未知错误"}`);
+        toast.error(`扫描批次失败：${messageOf(e, "未知错误")}`);
         if (consecutiveErrors >= 5) {
           setProgress((prev) => prev && { ...prev, status: "error" });
           break;
         }
-        await sleep(waitMs);
+        await sleep(1600);
       }
     }
   }
-
 
   const retryErrors = useMutation({
     mutationFn: () => requeueErrorsFn({ data: { jobId: progress!.jobId } }),
     onSuccess: (r) => {
       toast.success(`重新排队 ${r.requeued} 个错误项`);
-      if (progress) {
-        pausedRef.current = false;
-        setProgress({ ...progress, done: Math.max(0, progress.done - r.requeued), errors: 0, status: "running", paused: false });
-        runQueue(progress.jobId);
-      }
+      if (progress) runQueue(progress.jobId);
     },
-    onError: (e: any) => toast.error(e?.message ?? "重试失败"),
+    onError: (e: unknown) => toast.error(messageOf(e, "重试失败")),
   });
 
-  const closeProgress = () => { pausedRef.current = true; setProgress(null); refetch(); };
+  function updateFilters(next: TerminalFilters) {
+    setFilters({ ...next, pageSize: next.pageSize ?? filters.pageSize ?? 50 });
+  }
 
   return (
     <AppShell>
       <PageHeader
         title={title}
-        description={description ?? `命中 ${(data?.total ?? 0).toLocaleString()} 个域名${isFetching ? " · 加载中…" : ""}`}
+        description={
+          description ??
+          `命中 ${filteredRows.length.toLocaleString()} 个域名 · ${useMock ? "本地 5000 条 mock 演示数据" : "数据库实时数据"}`
+        }
         actions={
           <>
-            <button type="button" onClick={() => enrichBulk.mutate()}
-              disabled={enrichBulk.isPending || !(data?.rows ?? []).length}
+            <button
+              type="button"
+              onClick={() => enrichBulk.mutate()}
+              disabled={enrichBulk.isPending || !filteredRows.length}
               className="btn-base btn-ghost"
-              title="为当前结果批量创建 DNS/Archive/SEO 丰富任务（最多 500 个）">
-              <Sparkles className="h-4 w-4" />
-              {enrichBulk.isPending ? "创建中…" : "一键丰富当前结果"}
+            >
+              {enrichBulk.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              批量 enrich
             </button>
-            <button type="button" onClick={() => refetch()} disabled={isFetching} className="btn-base btn-ghost" title="重新查询">
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            <button
+              type="button"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+              className="btn-base btn-ghost"
+            >
+              <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
               刷新
             </button>
-            <button type="button" onClick={() => refetch()} className="btn-base btn-primary">
-              <Search className="h-4 w-4" />
-              查询
-            </button>
-            <button type="button" onClick={() => setMobileFilters(true)} className="btn-base btn-ghost lg:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileFilters(true)}
+              className="btn-base btn-primary lg:hidden"
+            >
               <Filter className="h-4 w-4" />
               筛选
             </button>
@@ -257,267 +334,307 @@ export function DiscoverView({
         }
       />
 
-      {/* 单域名实时检测 */}
-      <div className="card-elev mb-4 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Zap className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">单域名 RDAP 实时检测</span>
-          <input
-            value={quickDomain}
-            onChange={(e) => setQuickDomain(e.target.value.trim().toLowerCase())}
-            onKeyDown={(e) => { if (e.key === "Enter" && quickDomain) quickLookup.mutate(quickDomain); }}
-            placeholder="例如 example.com"
-            className="field flex-1 min-w-[200px]"
-          />
-          <button type="button" disabled={!quickDomain || quickLookup.isPending}
-            onClick={() => quickLookup.mutate(quickDomain)}
-            className="btn-base btn-primary">
-            {quickLookup.isPending ? "查询中…" : "查询"}
-          </button>
-          {quickResult && (
-            <div className="w-full text-xs text-muted-foreground font-mono mt-2 break-all">
-              <span className={`mr-2 rounded px-1.5 py-0.5 font-semibold ${
-                quickResult.status === "available" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
-                quickResult.status === "registered" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" :
-                "bg-rose-500/15 text-rose-700 dark:text-rose-300"
-              }`}>{quickResult.status}</span>
-              {quickResult.registrar && <>注册商: {quickResult.registrar} · </>}
-              {quickResult.expiresDate && <>到期: {quickResult.expiresDate} · </>}
-              {quickResult.source && <>来源: {quickResult.source}</>}
-              {quickResult.error && <span className="text-rose-600">错误: {quickResult.error}</span>}
-            </div>
-          )}
-        </div>
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
+        <StatCard
+          label="结果总数"
+          value={filteredRows.length.toLocaleString()}
+          hint={useMock ? "mock fallback" : "database"}
+          icon={<Database className="h-4 w-4" />}
+        />
+        <StatCard
+          label="高潜力"
+          value={totals.high.toLocaleString()}
+          tone="success"
+          hint="Score >= 82"
+        />
+        <StatCard
+          label="AI 推荐"
+          value={totals.ai.toLocaleString()}
+          tone="primary"
+          hint="可替换 LLM"
+        />
+        <StatCard label="平均评分" value={totals.avgScore} hint="当前筛选" />
+        <StatCard
+          label="低风险"
+          value={totals.lowRisk.toLocaleString()}
+          tone="success"
+          hint="排除灰产"
+        />
+        <StatCard
+          label="总估值"
+          value={
+            <>
+              <span className="sm:hidden">{formatCompactCurrency(totals.value)}</span>
+              <span className="hidden sm:inline">{formatCurrency(totals.value)}</span>
+            </>
+          }
+          tone="warning"
+          hint="估算区间"
+        />
       </div>
 
-      {/* RDAP 连通性 / 限流测试 */}
-      <div className="card-elev mb-4 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Activity className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">RDAP 连通性测试</span>
-          <input
-            value={pingDomain}
-            onChange={(e) => setPingDomain(e.target.value.trim().toLowerCase())}
-            onKeyDown={(e) => { if (e.key === "Enter" && pingDomain) pingTest.mutate(pingDomain); }}
-            placeholder="example.com"
-            className="field flex-1 min-w-[200px]"
-          />
-          <button type="button" disabled={!pingDomain || pingTest.isPending}
-            onClick={() => pingTest.mutate(pingDomain)}
-            className="btn-base btn-primary">
-            {pingTest.isPending ? "测试中…" : "测试连通性"}
-          </button>
-          {pingResult && (
-            <div className="w-full text-xs font-mono mt-2 break-all">
-              <span className={`mr-2 rounded px-1.5 py-0.5 font-semibold ${
-                pingResult.rateLimited ? "bg-rose-500/15 text-rose-700 dark:text-rose-300" :
-                pingResult.ok ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
-                "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-              }`}>
-                {pingResult.rateLimited ? "已被限流" : pingResult.ok ? "连通正常" : "异常"}
-              </span>
-              <span className="text-muted-foreground">
-                状态: {pingResult.status} · 延迟: {pingResult.latencyMs}ms
-                {pingResult.source && <> · 来源: {pingResult.source}</>}
-                {pingResult.error && <span className="text-rose-600"> · {pingResult.error}</span>}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 扫描策略 (实时生效) */}
-      <div className="card-elev mb-4 p-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Settings2 className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">扫描策略</span>
-          <span className="ml-auto text-xs text-muted-foreground">
-            当前: {strategy.batchSize}/批 · {strategy.pauseMs}ms 间隔 · 重试 {strategy.maxRetries} · 超时 {strategy.timeoutMs}ms · 理论速率 ~{(strategy.batchSize * 1000 / (strategy.pauseMs + 50)).toFixed(1)}/s
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-          <StratNum label="每批数量" min={1} max={50} value={strategy.batchSize}
-            onChange={(v) => setStrategy(s => ({ ...s, batchSize: v }))} />
-          <StratNum label="批间隔 (ms)" min={100} max={10000} step={100} value={strategy.pauseMs}
-            onChange={(v) => setStrategy(s => ({ ...s, pauseMs: v }))} />
-          <StratNum label="最大重试" min={0} max={5} value={strategy.maxRetries}
-            onChange={(v) => setStrategy(s => ({ ...s, maxRetries: v }))} />
-          <StratNum label="超时 (ms)" min={5000} max={60000} step={1000} value={strategy.timeoutMs}
-            onChange={(v) => setStrategy(s => ({ ...s, timeoutMs: v }))} />
-        </div>
-        {progress && (
-          <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-            调整将在下一个批次生效（当前任务正在运行）
+      <div className="terminal-panel mb-4 p-3">
+        <div className="grid gap-2 xl:grid-cols-[1.2fr_1fr_auto] xl:items-center">
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">实时候选扫描</span>
+            <span className="text-xs text-muted-foreground">
+              输入主体词后按当前 TLD 发起 RDAP 队列
+            </span>
           </div>
-        )}
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              value={quickDomain}
+              onChange={(e) =>
+                setQuickDomain(e.target.value.trim().toLowerCase().replace(/\..*$/, ""))
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") liveScan.mutate();
+              }}
+              placeholder="例如 aiagent / fintech / dog"
+              className="field pl-8"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => liveScan.mutate()}
+            disabled={liveScan.isPending || !!progress}
+            className="btn-base btn-primary"
+          >
+            {liveScan.isPending || progress ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Activity className="h-4 w-4" />
+            )}
+            开始扫描
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <aside className="card-elev hidden h-fit p-4 lg:block">
-          <FilterPanel filters={filters} onChange={setFilters} onSearch={() => refetch()}
-            onBatchScan={() => liveScan.mutate()} batchScanning={liveScan.isPending || !!progress}
-            tldOptions={tldData?.tlds} />
+      <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <aside className="terminal-panel hidden h-fit max-h-[calc(100vh-6rem)] overflow-y-auto p-4 lg:sticky lg:top-24 lg:block">
+          <FilterPanel
+            filters={filters}
+            onChange={updateFilters}
+            onSearch={() => query.refetch()}
+            onBatchScan={() => liveScan.mutate()}
+            batchScanning={liveScan.isPending || !!progress}
+            tldOptions={tldData?.tlds}
+          />
         </aside>
 
         <div className="min-w-0">
           <DomainTable
-            rows={(data?.rows ?? []) as DomainRow[]}
-            total={data?.total ?? 0}
+            rows={visibleRows}
+            total={filteredRows.length}
             filters={filters}
-            onChange={setFilters}
+            onChange={updateFilters}
             onWatch={(d) => watchMut.mutate(d)}
             onRefresh={(d) => refreshMut.mutate(d)}
             onEnrich={(d) => enrichOne.mutate(d)}
-            onDelete={(domains) => deleteMut.mutate(domains)}
+            isLoading={query.isFetching}
+            sourceLabel={useMock ? "Mock 5000" : "Database"}
           />
         </div>
       </div>
 
       {mobileFilters && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileFilters(false)} />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-xl bg-surface p-4 shadow-2xl">
+          <button
+            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            onClick={() => setMobileFilters(false)}
+            aria-label="关闭筛选"
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-2xl border border-border bg-background p-4 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-base font-semibold">筛选</h3>
-              <button onClick={() => setMobileFilters(false)} className="grid h-8 w-8 place-items-center rounded hover:bg-accent">
+              <button
+                onClick={() => setMobileFilters(false)}
+                className="grid h-8 w-8 place-items-center rounded hover:bg-accent"
+                aria-label="关闭"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <FilterPanel filters={filters} onChange={setFilters}
-              onSearch={() => { refetch(); setMobileFilters(false); }}
-              onBatchScan={() => { liveScan.mutate(); setMobileFilters(false); }}
+            <FilterPanel
+              filters={filters}
+              onChange={updateFilters}
+              onSearch={() => {
+                query.refetch();
+                setMobileFilters(false);
+              }}
+              onBatchScan={() => {
+                liveScan.mutate();
+                setMobileFilters(false);
+              }}
               batchScanning={liveScan.isPending || !!progress}
-              tldOptions={tldData?.tlds} />
-            <button onClick={() => setMobileFilters(false)} className="btn-base btn-primary mt-4 w-full">应用</button>
+              tldOptions={tldData?.tlds}
+            />
           </div>
         </div>
       )}
 
-      {/* 实时进度模态 */}
-      {progress && <ProgressModal p={progress} onClose={closeProgress}
-        onRetry={() => retryErrors.mutate()} retryPending={retryErrors.isPending}
-        onSkip={closeProgress} />}
+      {progress && (
+        <ProgressModal
+          p={progress}
+          onClose={() => {
+            setProgress(null);
+            query.refetch();
+          }}
+          onRetry={() => retryErrors.mutate()}
+          retryPending={retryErrors.isPending}
+        />
+      )}
     </AppShell>
   );
 }
 
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+function toServerFilters(filters: TerminalFilters): DiscoverFilters {
+  const allowedSort = ["score", "domain", "length", "drop_date", "created_at"].includes(
+    String(filters.sortBy),
+  )
+    ? (filters.sortBy as DiscoverFilters["sortBy"])
+    : "score";
+  return {
+    q: filters.q,
+    tlds: filters.tlds,
+    statuses: filters.statuses,
+    types: filters.types,
+    minLength: filters.minLength,
+    maxLength: filters.maxLength,
+    minScore: filters.minScore,
+    startsWith: filters.startsWith,
+    endsWith: filters.endsWith,
+    contains: filters.contains,
+    regex: filters.regex,
+    archiveYearMin: filters.archiveYearMin,
+    backlinksMin: filters.backlinksMin,
+    riskLevels: filters.riskLevels,
+    dropBefore: filters.dropTo,
+    page: filters.page,
+    pageSize: filters.pageSize,
+    sortBy: allowedSort,
+    sortDir: filters.sortDir,
+  };
+}
+
+function summarize(rows: DomainRow[]) {
+  if (!rows.length) return { high: 0, ai: 0, avgScore: 0, lowRisk: 0, value: 0 };
+  const score = Math.round(rows.reduce((s, r) => s + r.score, 0) / rows.length);
+  return {
+    high: rows.filter((r) => r.highPotential).length,
+    ai: rows.filter((r) => r.aiRecommended).length,
+    avgScore: score,
+    lowRisk: rows.filter((r) => r.risk_level === "low").length,
+    value: Math.round(rows.reduce((s, r) => s + r.estimatedValue, 0)),
+  };
+}
 
 function ProgressModal({
-  p, onClose, onRetry, onSkip, retryPending,
+  p,
+  onClose,
+  onRetry,
+  retryPending,
 }: {
   p: ProgressState;
   onClose: () => void;
   onRetry: () => void;
-  onSkip: () => void;
   retryPending: boolean;
 }) {
   const pct = p.total ? Math.min(100, Math.round((p.done / p.total) * 100)) : 0;
-  const remaining = Math.max(0, p.total - p.done);
   const elapsed = Math.max(1, Math.round((Date.now() - p.startedAt) / 1000));
-  const speed = (p.done / elapsed).toFixed(1);
-  const dl = (kind: string) => `/api/public/jobs/${p.jobId}/download?kind=${kind}`;
   const finished = p.status === "completed" || p.status === "stopped" || p.status === "error";
-  const success = p.available + p.registered;
-  const skipped = Math.max(0, p.total - p.done);
 
-  // tick to refresh elapsed/speed
-  const [, force] = useState(0);
-  useEffect(() => { const t = setInterval(() => force(n => n + 1), 1000); return () => clearInterval(t); }, []);
-
-  // 扫描结束后拉取错误明细并按原因分组
   const { data: errAll } = useQuery({
     queryKey: ["job-errors-all", p.jobId, finished],
     queryFn: () => recentItemsFn({ data: { jobId: p.jobId, kind: "error", limit: 500 } }),
     enabled: finished && p.errors > 0,
     staleTime: 30_000,
   });
-  const errorGroups = (() => {
+  const errorGroups = useMemo(() => {
     const map = new Map<string, number>();
     for (const it of errAll ?? []) {
       const key = normalizeErr(it.error ?? "未知错误");
       map.set(key, (map.get(key) ?? 0) + 1);
     }
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12);
-  })();
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+  }, [errAll]);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center p-4">
-      <div className="absolute inset-0 bg-black/40" />
-      <div className="relative w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <button
+        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label="关闭扫描进度"
+      />
+      <div className="terminal-panel relative w-full max-w-lg p-5">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-semibold flex items-center gap-2">
+          <h3 className="flex items-center gap-2 text-base font-semibold">
             <Zap className="h-4 w-4 text-primary" />
             {finished ? "扫描摘要" : "RDAP 实时扫描"}
-            <span className={`ml-1 rounded px-1.5 py-0.5 text-xs ${
-              finished ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-primary/15 text-primary"
-            }`}>{p.status}</span>
+            <span className="glass-chip">{p.status}</span>
           </h3>
-          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded hover:bg-accent" title="关闭"><X className="h-4 w-4" /></button>
+          <button
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded hover:bg-accent"
+            title="关闭"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-
         <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-muted">
-          <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${pct}%` }}
+          />
         </div>
-        <div className="mb-3 grid grid-cols-4 gap-2 text-center text-xs">
-          <Stat label="已完成" value={`${p.done}/${p.total}`} />
-          <Stat label="可注册" value={p.available} accent="emerald" />
-          <Stat label="已注册" value={p.registered} accent="amber" />
-          <Stat label="错误" value={p.errors} accent="rose" />
+        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+          <ProgressStat label="已完成" value={`${p.done}/${p.total}`} />
+          <ProgressStat label="可注册" value={p.available} tone="success" />
+          <ProgressStat label="已注册" value={p.registered} tone="warning" />
+          <ProgressStat label="错误" value={p.errors} tone="danger" />
         </div>
-        <div className="mb-3 text-xs text-muted-foreground">
-          剩余 {remaining} · 已用 {elapsed}s · 速率 ~{speed}/s · 进度 {pct}%
+        <div className="mt-3 text-xs text-muted-foreground">
+          已用 {elapsed}s · 进度 {pct}%
         </div>
-
-        {finished && (
-          <div className="mb-3 rounded border border-border bg-background/40 p-3 text-xs">
-            <div className="mb-2 grid grid-cols-4 gap-2 text-center">
-              <Stat label="成功" value={success} accent="emerald" />
-              <Stat label="失败" value={p.errors} accent="rose" />
-              <Stat label="跳过" value={skipped} accent="amber" />
-              <Stat label="耗时" value={`${elapsed}s`} />
-            </div>
-            {errorGroups.length > 0 ? (
-              <div>
-                <div className="mb-1 font-semibold text-foreground">失败原因分组</div>
-                <ul className="space-y-0.5 font-mono">
-                  {errorGroups.map(([reason, n]) => (
-                    <li key={reason} className="flex justify-between gap-2">
-                      <span className="truncate text-rose-600">{reason}</span>
-                      <span className="shrink-0 text-muted-foreground">×{n}</span>
-                    </li>
-                  ))}
-                </ul>
+        {errorGroups.length > 0 && (
+          <div className="mt-3 rounded-lg border border-destructive/25 bg-destructive/10 p-3 text-xs">
+            {errorGroups.map(([reason, n]) => (
+              <div key={reason} className="flex justify-between gap-2">
+                <span>{reason}</span>
+                <span>×{n}</span>
               </div>
-            ) : p.errors === 0 ? (
-              <div className="text-muted-foreground">本次扫描无失败 🎉</div>
-            ) : (
-              <div className="text-muted-foreground">正在加载失败原因…</div>
-            )}
-          </div>
-        )}
-
-        {!finished && p.errorSamples.length > 0 && (
-          <div className="mb-3 max-h-40 overflow-y-auto rounded border border-border bg-background/50 p-2 text-xs font-mono">
-            <div className="mb-1 text-muted-foreground">最近失败 ({p.errors})</div>
-            {p.errorSamples.map((e, i) => (
-              <div key={i} className="truncate"><span className="text-rose-600">{e.domain}</span> · {e.error}</div>
             ))}
           </div>
         )}
-
-        <div className="flex flex-wrap gap-2">
-          <a href={dl("csv")} download className="btn-base btn-ghost text-xs"><Download className="h-3.5 w-3.5" />CSV</a>
-          <a href={dl("available")} download className="btn-base btn-ghost text-xs"><Download className="h-3.5 w-3.5" />可注册</a>
-          <a href={dl("errors")} download className="btn-base btn-ghost text-xs"><Download className="h-3.5 w-3.5" />错误清单</a>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <a
+            href={`/api/public/jobs/${p.jobId}/download?kind=csv`}
+            download
+            className="btn-base btn-ghost text-xs"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            CSV
+          </a>
           {p.errors > 0 && (
-            <button onClick={onRetry} disabled={retryPending} className="btn-base btn-primary text-xs">
-              <RotateCw className={`h-3.5 w-3.5 ${retryPending ? "animate-spin" : ""}`} />
-              一键重试错误
+            <button
+              onClick={onRetry}
+              disabled={retryPending}
+              className="btn-base btn-primary text-xs"
+            >
+              {retryPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              重试错误
             </button>
           )}
-          <button onClick={onSkip} className="btn-base btn-ghost text-xs ml-auto">
-            <SkipForward className="h-3.5 w-3.5" />{finished ? "关闭并查看结果" : "跳过/关闭"}
+          <button onClick={onClose} className="btn-base btn-ghost ml-auto text-xs">
+            关闭
           </button>
         </div>
       </div>
@@ -525,44 +642,54 @@ function ProgressModal({
   );
 }
 
-function normalizeErr(raw: string): string {
-  const s = raw.toLowerCase();
-  if (/429|rate.?limit|too many/.test(s)) return "限流 (429 / rate limit)";
-  if (/timeout|timed.?out|etimedout/.test(s)) return "请求超时";
-  if (/network|fetch failed|enotfound|econnreset|socket/.test(s)) return "网络错误";
-  if (/404|not.?found/.test(s)) return "RDAP 未找到 (404)";
-  if (/5\d\d/.test(s)) return "服务器错误 (5xx)";
-  if (/unsupported|no rdap/.test(s)) return "TLD 不支持 RDAP";
-  if (/invalid|parse/.test(s)) return "解析/格式错误";
-  return raw.length > 60 ? raw.slice(0, 60) + "…" : raw;
-}
-
-function Stat({ label, value, accent }: { label: string; value: number | string; accent?: "emerald" | "amber" | "rose" }) {
-  const cls = accent === "emerald" ? "text-emerald-600 dark:text-emerald-400"
-    : accent === "amber" ? "text-amber-600 dark:text-amber-400"
-    : accent === "rose" ? "text-rose-600 dark:text-rose-400"
-    : "text-foreground";
+function ProgressStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone?: "success" | "warning" | "danger";
+}) {
+  const cls =
+    tone === "success"
+      ? "text-success"
+      : tone === "warning"
+        ? "text-warning"
+        : tone === "danger"
+          ? "text-destructive"
+          : "text-foreground";
   return (
-    <div className="rounded border border-border bg-background/50 p-2">
-      <div className={`text-base font-semibold ${cls}`}>{value}</div>
+    <div className="rounded-lg border border-border bg-surface/70 p-2">
+      <div className={`text-base font-semibold mono ${cls}`}>{value}</div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
     </div>
   );
 }
 
-function StratNum({ label, value, onChange, min, max, step = 1 }: {
-  label: string; value: number; onChange: (v: number) => void; min: number; max: number; step?: number;
-}) {
-  return (
-    <label className="block">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <input type="number" min={min} max={max} step={step} value={value}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          if (!Number.isFinite(n)) return;
-          onChange(Math.max(min, Math.min(max, n)));
-        }}
-        className="field w-full" />
-    </label>
-  );
+function normalizeErr(raw: string): string {
+  const s = raw.toLowerCase();
+  if (/429|rate.?limit|too many/.test(s)) return "限流 (429)";
+  if (/timeout|timed.?out|etimedout/.test(s)) return "请求超时";
+  if (/network|fetch failed|enotfound|econnreset|socket/.test(s)) return "网络错误";
+  if (/404|not.?found/.test(s)) return "RDAP 未找到";
+  if (/unsupported|no rdap/.test(s)) return "TLD 不支持 RDAP";
+  return raw.length > 60 ? raw.slice(0, 60) + "..." : raw;
+}
+
+function useDebouncedValue<T>(value: T, delay: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function messageOf(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }

@@ -32,11 +32,16 @@ export async function fetchDns(domain: string) {
   return { a_records: a, ns_records: ns, mx_records: mx, txt_records: txt };
 }
 
-export async function fetchArchive(domain: string): Promise<{ archive_year: number | null; archive_count: number }> {
+export async function fetchArchive(
+  domain: string,
+): Promise<{ archive_year: number | null; archive_count: number }> {
   try {
-    const r = await fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(domain)}&timestamp=19960101`, {
-      signal: AbortSignal.timeout(6000),
-    });
+    const r = await fetch(
+      `https://archive.org/wayback/available?url=${encodeURIComponent(domain)}&timestamp=19960101`,
+      {
+        signal: AbortSignal.timeout(6000),
+      },
+    );
     if (!r.ok) return { archive_year: null, archive_count: 0 };
     const j: any = await r.json();
     const ts: string | undefined = j?.archived_snapshots?.closest?.timestamp;
@@ -48,16 +53,29 @@ export async function fetchArchive(domain: string): Promise<{ archive_year: numb
 }
 
 export type NotifyChannel = "bark" | "webhook";
-export interface NotifyResult { channel: NotifyChannel; ok: boolean; status?: number; error?: string }
+export interface NotifyResult {
+  channel: NotifyChannel;
+  ok: boolean;
+  status?: number;
+  error?: string;
+}
 
-export async function sendNotification(channels: { bark?: string; webhook?: string }, title: string, body: string): Promise<NotifyResult[]> {
+export async function sendNotification(
+  channels: { bark?: string; webhook?: string },
+  title: string,
+  body: string,
+): Promise<NotifyResult[]> {
   const out: NotifyResult[] = [];
   if (channels.bark) {
     try {
-      const url = channels.bark.replace(/\/$/, "") + `/${encodeURIComponent(title)}/${encodeURIComponent(body)}`;
+      const url =
+        channels.bark.replace(/\/$/, "") +
+        `/${encodeURIComponent(title)}/${encodeURIComponent(body)}`;
       const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
       out.push({ channel: "bark", ok: r.ok, status: r.status });
-    } catch (e: any) { out.push({ channel: "bark", ok: false, error: String(e?.message ?? e) }); }
+    } catch (e: any) {
+      out.push({ channel: "bark", ok: false, error: String(e?.message ?? e) });
+    }
   }
   if (channels.webhook) {
     try {
@@ -68,7 +86,9 @@ export async function sendNotification(channels: { bark?: string; webhook?: stri
         signal: AbortSignal.timeout(6000),
       });
       out.push({ channel: "webhook", ok: r.ok, status: r.status });
-    } catch (e: any) { out.push({ channel: "webhook", ok: false, error: String(e?.message ?? e) }); }
+    } catch (e: any) {
+      out.push({ channel: "webhook", ok: false, error: String(e?.message ?? e) });
+    }
   }
   return out;
 }

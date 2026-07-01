@@ -12,7 +12,11 @@ export const Route = createFileRoute("/api/public/enrich/$id/download")({
 
         const { pgShim } = await import("@/lib/pg-shim.server");
         const db = pgShim;
-        const { data: job } = await db.from("enrich_jobs").select("id, name, kinds").eq("id", id).maybeSingle();
+        const { data: job } = await db
+          .from("enrich_jobs")
+          .select("id, name, kinds")
+          .eq("id", id)
+          .maybeSingle();
         if (!job) return new Response("Not found", { status: 404 });
 
         // Pull all items (capped)
@@ -50,7 +54,7 @@ export const Route = createFileRoute("/api/public/enrich/$id/download")({
         }
 
         if (kind === "available_enriched_csv") {
-          rows = rows.filter(r => r.registration_status === "available");
+          rows = rows.filter((r) => r.registration_status === "available");
         }
 
         if (kind === "enriched_json") {
@@ -63,10 +67,18 @@ export const Route = createFileRoute("/api/public/enrich/$id/download")({
         }
 
         const headers = [
-          "domain","registration_status","registrar","expiry",
-          "dns_a","dns_ns","dns_mx",
-          "archive_year","archive_count",
-          "seo_rank","seo_traffic","seo_keywords",
+          "domain",
+          "registration_status",
+          "registrar",
+          "expiry",
+          "dns_a",
+          "dns_ns",
+          "dns_mx",
+          "archive_year",
+          "archive_count",
+          "seo_rank",
+          "seo_traffic",
+          "seo_keywords",
         ];
         const lines = [headers.join(",")];
         for (const r of rows) {
@@ -89,7 +101,8 @@ export const Route = createFileRoute("/api/public/enrich/$id/download")({
           ].map(csvCell);
           lines.push(cells.join(","));
         }
-        const fname = kind === "available_enriched_csv" ? `available-enriched-${id}.csv` : `enriched-${id}.csv`;
+        const fname =
+          kind === "available_enriched_csv" ? `available-enriched-${id}.csv` : `enriched-${id}.csv`;
         return new Response(lines.join("\n"), {
           headers: {
             "content-type": "text/csv; charset=utf-8",

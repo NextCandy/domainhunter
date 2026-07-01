@@ -13,10 +13,8 @@ type WatchRow = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
   var __domainHunterWatchlistScheduler:
-    | { started: boolean; running: boolean; timer?: ReturnType<typeof setInterval> }
-    | undefined;
+    { started: boolean; running: boolean; timer?: ReturnType<typeof setInterval> } | undefined;
 }
 
 function settingValue<T = unknown>(settings: Record<string, unknown>, key: string, fallback: T): T {
@@ -32,7 +30,13 @@ async function loadSettings() {
   return Object.fromEntries(rows.map((row) => [row.key, row.value])) as Record<string, unknown>;
 }
 
-async function notify(row: WatchRow, eventKey: string, title: string, body: string, settings: Record<string, unknown>) {
+async function notify(
+  row: WatchRow,
+  eventKey: string,
+  title: string,
+  body: string,
+  settings: Record<string, unknown>,
+) {
   if (row.last_notified_status === eventKey) return;
   const bark = settingValue<string | undefined>(settings, "notify_bark", undefined);
   const webhook = settingValue<string | undefined>(settings, "notify_webhook", undefined);
@@ -55,7 +59,10 @@ async function notify(row: WatchRow, eventKey: string, title: string, body: stri
 
 export async function refreshWatchlistStatus() {
   const settings = await loadSettings();
-  const beforeDays = Math.max(1, Math.min(30, Number(settingValue(settings, "notify_before_drop_days", 3))));
+  const beforeDays = Math.max(
+    1,
+    Math.min(30, Number(settingValue(settings, "notify_before_drop_days", 3))),
+  );
   const { rows } = await query<WatchRow>(`
     SELECT
       w.id,
@@ -83,10 +90,13 @@ export async function refreshWatchlistStatus() {
       const lookup = await lookupDomain(row.domain, { timeoutMs: 20_000, retries: 1 });
       checked += 1;
       const nextStatus =
-        lookup.status === "available" ? "available" :
-        lookup.status === "registered" ? "registered" :
-        lookup.status === "unsupported" ? "unsupported" :
-        row.current_status ?? "unknown";
+        lookup.status === "available"
+          ? "available"
+          : lookup.status === "registered"
+            ? "registered"
+            : lookup.status === "unsupported"
+              ? "unsupported"
+              : (row.current_status ?? "unknown");
 
       await query(
         `UPDATE public.domains

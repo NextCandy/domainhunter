@@ -38,13 +38,21 @@ const DEFAULT_RDAP_QPS = 5;
 declare global {
   // eslint-disable-next-line no-var
   var __domainHunterRdapBucket:
-    | { tokens: number; lastRefill: number; queue: Array<() => void>; qps: number; timer?: ReturnType<typeof setInterval> }
+    | {
+        tokens: number;
+        lastRefill: number;
+        queue: Array<() => void>;
+        qps: number;
+        timer?: ReturnType<typeof setInterval>;
+      }
     | undefined;
 }
 
 function rdapQps() {
   const configured = Number(process.env.RDAP_GLOBAL_QPS ?? DEFAULT_RDAP_QPS);
-  return Number.isFinite(configured) && configured > 0 ? Math.min(configured, 50) : DEFAULT_RDAP_QPS;
+  return Number.isFinite(configured) && configured > 0
+    ? Math.min(configured, 50)
+    : DEFAULT_RDAP_QPS;
 }
 
 function bucket() {
@@ -111,7 +119,10 @@ async function saveCached(key: string, value: any) {
 }
 
 function normalizeLookupDomain(domain: string) {
-  const trimmed = domain.trim().toLowerCase().replace(/^\.+|\.+$/g, "");
+  const trimmed = domain
+    .trim()
+    .toLowerCase()
+    .replace(/^\.+|\.+$/g, "");
   return domainToASCII(trimmed) || trimmed;
 }
 
@@ -188,7 +199,11 @@ function parseGenericWhois(text: string): DomainInfo {
     return {
       status: "registered",
       source: "whois",
-      registrar: grabWhoisLine(body, [/^Registrar:\s*(.+)$/im, /^Sponsoring Registrar:\s*(.+)$/im, /^registrar:\s*(.+)$/im]),
+      registrar: grabWhoisLine(body, [
+        /^Registrar:\s*(.+)$/im,
+        /^Sponsoring Registrar:\s*(.+)$/im,
+        /^registrar:\s*(.+)$/im,
+      ]),
       createdDate: grabWhoisLine(body, [
         /^Creation Date:\s*(.+)$/im,
         /^Created On:\s*(.+)$/im,
@@ -203,8 +218,14 @@ function parseGenericWhois(text: string): DomainInfo {
         /^Expires On:\s*(.+)$/im,
         /^paid-till:\s*(.+)$/im,
       ]),
-      updatedDate: grabWhoisLine(body, [/^Updated Date:\s*(.+)$/im, /^Last Updated On:\s*(.+)$/im, /^changed:\s*(.+)$/im]),
-      nameservers: uniqueWhoisLines(body.matchAll(/^(?:Name Server|nserver):\s*(.+)$/gim)).map((v) => v.toLowerCase()),
+      updatedDate: grabWhoisLine(body, [
+        /^Updated Date:\s*(.+)$/im,
+        /^Last Updated On:\s*(.+)$/im,
+        /^changed:\s*(.+)$/im,
+      ]),
+      nameservers: uniqueWhoisLines(body.matchAll(/^(?:Name Server|nserver):\s*(.+)$/gim)).map(
+        (v) => v.toLowerCase(),
+      ),
       statuses: uniqueWhoisLines(body.matchAll(/^(?:Domain Status|status):\s*(.+)$/gim)),
       dnssec: /^DNSSEC:\s*(?:signed|yes|true)/im.test(body),
     };
@@ -328,14 +349,18 @@ function pickRegistrar(entities: any[] | undefined): string | undefined {
 }
 
 function parseRdapResponse(json: any): DomainInfo {
-  const isReserved = (json?.status || []).some((status: string) => /reserved|withheld|blocked/i.test(status));
+  const isReserved = (json?.status || []).some((status: string) =>
+    /reserved|withheld|blocked/i.test(status),
+  );
   return {
     status: isReserved ? "reserved" : "registered",
     source: "rdap",
     registrar: pickRegistrar(json?.entities),
     createdDate: pickEvent(json?.events, "registration"),
     expiresDate: pickEvent(json?.events, "expiration"),
-    updatedDate: pickEvent(json?.events, "last changed") || pickEvent(json?.events, "last update of RDAP database"),
+    updatedDate:
+      pickEvent(json?.events, "last changed") ||
+      pickEvent(json?.events, "last update of RDAP database"),
     nameservers: Array.isArray(json?.nameservers)
       ? json.nameservers.map((item: any) => (item?.ldhName || "").toLowerCase()).filter(Boolean)
       : [],
@@ -346,7 +371,11 @@ function parseRdapResponse(json: any): DomainInfo {
   };
 }
 
-async function tryRdapLookup(server: string, domain: string, timeoutMs: number): Promise<DomainInfo> {
+async function tryRdapLookup(
+  server: string,
+  domain: string,
+  timeoutMs: number,
+): Promise<DomainInfo> {
   const base = server.endsWith("/") ? server : `${server}/`;
   const url = `${base}domain/${encodeURIComponent(domain)}`;
   await waitForRdapToken();
@@ -407,7 +436,9 @@ export async function lookupDomain(
         return await tryRdapLookup(rdapServer, asciiDomain, timeoutMs);
       } catch (error: any) {
         rdapError = error;
-        await sleep((error?.message || "").includes("429") ? 500 * (attempt + 1) : 300 * (attempt + 1));
+        await sleep(
+          (error?.message || "").includes("429") ? 500 * (attempt + 1) : 300 * (attempt + 1),
+        );
       }
     }
   }

@@ -17,14 +17,17 @@ export const Route = createFileRoute("/api/health")({
             time: new Date().toISOString(),
           });
         } catch {
-          return Response.json({
-            ok: false,
-            db: "error",
-            memory: { rss: memory.rss, heapUsed: memory.heapUsed },
-            node: process.version,
-            uptime: process.uptime(),
-            time: new Date().toISOString(),
-          }, { status: 503 });
+          return Response.json(
+            {
+              ok: false,
+              db: "error",
+              memory: { rss: memory.rss, heapUsed: memory.heapUsed },
+              node: process.version,
+              uptime: process.uptime(),
+              time: new Date().toISOString(),
+            },
+            { status: 503 },
+          );
         }
       },
     },

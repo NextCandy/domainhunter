@@ -80,8 +80,13 @@ async function api(path: string, init: RequestInit = {}, retry = true) {
     data = { message: text };
   }
   if (!res.ok) {
-    const canRefresh = res.status === 401 && retry && !path.includes("/auth/refresh") && !path.includes("/auth/login") && !path.includes("/auth/signup");
-    if (canRefresh && await refreshAccessToken()) return api(path, init, false);
+    const canRefresh =
+      res.status === 401 &&
+      retry &&
+      !path.includes("/auth/refresh") &&
+      !path.includes("/auth/login") &&
+      !path.includes("/auth/signup");
+    if (canRefresh && (await refreshAccessToken())) return api(path, init, false);
     throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
   }
   return data;

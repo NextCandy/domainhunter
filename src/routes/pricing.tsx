@@ -15,7 +15,11 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute("/pricing")({
   validateSearch: (s) => searchSchema.parse(s),
-  component: () => <AppShell><PricingPage /></AppShell>,
+  component: () => (
+    <AppShell>
+      <PricingPage />
+    </AppShell>
+  ),
 });
 
 const QUICK_TLDS = ["com", "net", "org", "io", "ai", "app", "dev", "co", "xyz", "me"];
@@ -31,13 +35,18 @@ function PricingPage() {
   const initDomain = search.domain ?? "";
   const [tld, setTld] = useState(initTld);
   const [domain, setDomain] = useState(initDomain);
-  const [submitted, setSubmitted] = useState<{ tld: string; domain?: string }>({ tld: initTld, domain: initDomain || undefined });
+  const [submitted, setSubmitted] = useState<{ tld: string; domain?: string }>({
+    tld: initTld,
+    domain: initDomain || undefined,
+  });
 
   // Re-sync when query string changes (e.g. from /ideas)
   useEffect(() => {
     const t = (search.tld ?? "com").replace(/^\./, "");
     const d = search.domain ?? "";
-    setTld(t); setDomain(d); setSubmitted({ tld: t, domain: d || undefined });
+    setTld(t);
+    setDomain(d);
+    setSubmitted({ tld: t, domain: d || undefined });
   }, [search.tld, search.domain]);
 
   const q = useQuery({
@@ -68,34 +77,49 @@ function PricingPage() {
             <label className="mb-1 block text-xs font-medium text-muted-foreground">TLD 后缀</label>
             <input
               value={tld}
-              onChange={e => setTld(e.target.value.replace(/^\./, ""))}
+              onChange={(e) => setTld(e.target.value.replace(/^\./, ""))}
               placeholder="com"
               className="field"
             />
           </div>
           <div className="self-end pb-1 text-xs text-muted-foreground">·</div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">要查询的完整域名（可选，用于生成购买链接）</label>
-            <input value={domain} onChange={e => setDomain(e.target.value)} placeholder="example.com" className="field" />
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              要查询的完整域名（可选，用于生成购买链接）
+            </label>
+            <input
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              placeholder="example.com"
+              className="field"
+            />
           </div>
           <div className="self-end">
             <button
-              onClick={() => setSubmitted({ tld: tld.trim() || "com", domain: domain.trim() || undefined })}
+              onClick={() =>
+                setSubmitted({ tld: tld.trim() || "com", domain: domain.trim() || undefined })
+              }
               className="btn-base btn-primary w-full"
               disabled={q.isFetching}
             >
-              <Search className="h-4 w-4" />对比价格
+              <Search className="h-4 w-4" />
+              对比价格
             </button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           <span className="text-xs text-muted-foreground">快速选择：</span>
-          {QUICK_TLDS.map(t => (
+          {QUICK_TLDS.map((t) => (
             <button
               key={t}
-              onClick={() => { setTld(t); setSubmitted({ tld: t, domain: domain.trim() || undefined }); }}
+              onClick={() => {
+                setTld(t);
+                setSubmitted({ tld: t, domain: domain.trim() || undefined });
+              }}
               className={`rounded px-2 py-0.5 text-xs ring-1 ring-inset ${submitted.tld === t ? "bg-primary/10 text-primary ring-primary/30" : "bg-surface text-muted-foreground ring-border hover:text-foreground"}`}
-            >.{t}</button>
+            >
+              .{t}
+            </button>
           ))}
         </div>
       </section>
@@ -107,29 +131,56 @@ function PricingPage() {
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium uppercase text-success">推荐购买</div>
               <div className="mt-0.5 text-lg font-semibold">
-                {best.registrar_name} · {fmtPrice(best.discounted_price ?? best.register_price, best.currency)}
-                {best.coupon_code && <span className="ml-2 text-sm text-muted-foreground">优惠码 <code className="rounded bg-surface px-1.5 py-0.5 text-xs">{best.coupon_code}</code></span>}
+                {best.registrar_name} ·{" "}
+                {fmtPrice(best.discounted_price ?? best.register_price, best.currency)}
+                {best.coupon_code && (
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    优惠码{" "}
+                    <code className="rounded bg-surface px-1.5 py-0.5 text-xs">
+                      {best.coupon_code}
+                    </code>
+                  </span>
+                )}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
                 续费 {fmtPrice(best.renew_price, best.currency)} · 评分 {best.recommend_score}/100
-                {best.privacy_free && <span className="ml-2 inline-flex items-center gap-1 text-success"><ShieldCheck className="h-3 w-3" />免费隐私保护</span>}
-                {best.api_supported && <span className="ml-2 inline-flex items-center gap-1 text-primary"><Zap className="h-3 w-3" />API 可用</span>}
+                {best.privacy_free && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-success">
+                    <ShieldCheck className="h-3 w-3" />
+                    免费隐私保护
+                  </span>
+                )}
+                {best.api_supported && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-primary">
+                    <Zap className="h-3 w-3" />
+                    API 可用
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
               {best.buy_url_template && (
-                <a href={best.buy_url_template} target="_blank" rel="noreferrer" className="btn-base btn-primary">
-                  前往购买<ExternalLink className="h-4 w-4" />
+                <a
+                  href={best.buy_url_template}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-base btn-primary"
+                >
+                  前往购买
+                  <ExternalLink className="h-4 w-4" />
                 </a>
               )}
               {submitted.domain && (
                 <button
-                  onClick={() => buyMut.mutate({ domain: submitted.domain!, registrar: best.registrar_name })}
+                  onClick={() =>
+                    buyMut.mutate({ domain: submitted.domain!, registrar: best.registrar_name })
+                  }
                   disabled={buyMut.isPending}
                   className="btn-base"
                   title="标记已购买 → 加入我的域名"
                 >
-                  <ShoppingCart className="h-4 w-4" />标记已购
+                  <ShoppingCart className="h-4 w-4" />
+                  标记已购
                 </button>
               )}
             </div>
@@ -143,9 +194,16 @@ function PricingPage() {
           <span className="text-xs text-muted-foreground">{rows.length} 个</span>
         </header>
         {q.isLoading ? (
-          <table className="w-full text-sm"><tbody><TableSkeleton rows={5} cols={8} /></tbody></table>
+          <table className="w-full text-sm">
+            <tbody>
+              <TableSkeleton rows={5} cols={8} />
+            </tbody>
+          </table>
         ) : rows.length === 0 ? (
-          <EmptyState title="暂无该 TLD 的价格数据" hint="可前往 后台 → 价格管理 添加各注册商的价格。" />
+          <EmptyState
+            title="暂无该 TLD 的价格数据"
+            hint="可前往 后台 → 价格管理 添加各注册商的价格。"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -162,48 +220,85 @@ function PricingPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
+                {rows.map((r) => (
                   <tr key={r.id} className="border-t border-border/60 hover:bg-accent/40">
                     <td className="px-4 py-2 font-medium">{r.registrar_name}</td>
                     <td className="px-4 py-2 text-right tabular-nums">
-                      {r.discounted_price != null && r.register_price != null && r.discounted_price < r.register_price ? (
+                      {r.discounted_price != null &&
+                      r.register_price != null &&
+                      r.discounted_price < r.register_price ? (
                         <>
-                          <span className="text-success font-semibold">{fmtPrice(r.discounted_price, r.currency)}</span>
-                          <span className="ml-1 text-xs text-muted-foreground line-through">{fmtPrice(r.register_price, r.currency)}</span>
+                          <span className="text-success font-semibold">
+                            {fmtPrice(r.discounted_price, r.currency)}
+                          </span>
+                          <span className="ml-1 text-xs text-muted-foreground line-through">
+                            {fmtPrice(r.register_price, r.currency)}
+                          </span>
                         </>
                       ) : (
                         <span>{fmtPrice(r.register_price, r.currency)}</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums">{fmtPrice(r.renew_price, r.currency)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{fmtPrice(r.transfer_price, r.currency)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {fmtPrice(r.renew_price, r.currency)}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {fmtPrice(r.transfer_price, r.currency)}
+                    </td>
                     <td className="px-4 py-2">
                       {r.coupon_code ? (
                         <span className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-xs text-warning">
-                          <Tag className="h-3 w-3" />{r.coupon_code}
+                          <Tag className="h-3 w-3" />
+                          {r.coupon_code}
                         </span>
-                      ) : "—"}
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">
-                      {r.privacy_free && <span className="mr-2 inline-flex items-center gap-1 text-success"><ShieldCheck className="h-3 w-3" />隐私</span>}
-                      {r.api_supported && <span className="inline-flex items-center gap-1 text-primary"><Zap className="h-3 w-3" />API</span>}
+                      {r.privacy_free && (
+                        <span className="mr-2 inline-flex items-center gap-1 text-success">
+                          <ShieldCheck className="h-3 w-3" />
+                          隐私
+                        </span>
+                      )}
+                      {r.api_supported && (
+                        <span className="inline-flex items-center gap-1 text-primary">
+                          <Zap className="h-3 w-3" />
+                          API
+                        </span>
+                      )}
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums font-semibold">{r.recommend_score}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-semibold">
+                      {r.recommend_score}
+                    </td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {r.buy_url_template && (
-                          <a href={r.buy_url_template} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                            购买<ExternalLink className="h-3 w-3" />
+                          <a
+                            href={r.buy_url_template}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            购买
+                            <ExternalLink className="h-3 w-3" />
                           </a>
                         )}
                         {submitted.domain && (
                           <button
-                            onClick={() => buyMut.mutate({ domain: submitted.domain!, registrar: r.registrar_name })}
+                            onClick={() =>
+                              buyMut.mutate({
+                                domain: submitted.domain!,
+                                registrar: r.registrar_name,
+                              })
+                            }
                             disabled={buyMut.isPending}
                             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground ring-1 ring-inset ring-border hover:text-foreground"
                             title="记录购买并加入我的域名"
                           >
-                            <ShoppingCart className="h-3 w-3" />标记已购
+                            <ShoppingCart className="h-3 w-3" />
+                            标记已购
                           </button>
                         )}
                       </div>
@@ -217,7 +312,10 @@ function PricingPage() {
       </section>
 
       <section className="card-elev p-5">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Tag className="h-4 w-4" />当前可用优惠码</h3>
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <Tag className="h-4 w-4" />
+          当前可用优惠码
+        </h3>
         {coupons.length === 0 ? (
           <p className="text-xs text-muted-foreground">暂无该 TLD 的可用优惠。</p>
         ) : (
@@ -225,14 +323,26 @@ function PricingPage() {
             {coupons.map((c: any) => (
               <li key={c.id} className="rounded-md border border-border bg-surface p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <code className="rounded bg-accent px-1.5 py-0.5 text-xs font-semibold">{c.code}</code>
+                  <code className="rounded bg-accent px-1.5 py-0.5 text-xs font-semibold">
+                    {c.code}
+                  </code>
                   <span className="text-xs text-muted-foreground">
-                    {c.discount_type === "percent" ? `-${c.discount_value}%` : c.discount_type === "fixed" ? `-${c.discount_value}` : `=${c.discount_value}`}
+                    {c.discount_type === "percent"
+                      ? `-${c.discount_value}%`
+                      : c.discount_type === "fixed"
+                        ? `-${c.discount_value}`
+                        : `=${c.discount_value}`}
                   </span>
                 </div>
                 {c.title && <div className="mt-1 text-xs font-medium">{c.title}</div>}
-                {c.description && <div className="mt-0.5 text-xs text-muted-foreground">{c.description}</div>}
-                {c.valid_until && <div className="mt-1 text-[11px] text-muted-foreground">有效期至 {new Date(c.valid_until).toLocaleDateString()}</div>}
+                {c.description && (
+                  <div className="mt-0.5 text-xs text-muted-foreground">{c.description}</div>
+                )}
+                {c.valid_until && (
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    有效期至 {new Date(c.valid_until).toLocaleDateString()}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

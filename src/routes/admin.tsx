@@ -18,15 +18,21 @@ const TABS = [
 ];
 
 function AdminLayout() {
-  const pathname = useRouterState({ select: s => s.location.pathname });
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <AppShell>
       <PageHeader title="后台" description="数据源、评分规则、注册商配置、任务队列与系统设置" />
       <div className="mb-6 flex flex-wrap gap-1 border-b border-border">
-        {TABS.map(t => {
+        {TABS.map((t) => {
           const active = t.exact ? pathname === t.to : pathname.startsWith(t.to);
           return (
-            <Link key={t.to} to={t.to} className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{t.label}</Link>
+            <Link
+              key={t.to}
+              to={t.to}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              {t.label}
+            </Link>
           );
         })}
       </div>

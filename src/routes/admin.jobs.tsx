@@ -20,13 +20,31 @@ function AdminJobs() {
 
   return (
     <div>
-      <p className="mb-3 text-sm text-muted-foreground">查询任务来自批量 RDAP 工具。可以在<Link to="/tools/batch-rdap" className="text-primary hover:underline">/tools/batch-rdap</Link> 创建任务。</p>
+      <p className="mb-3 text-sm text-muted-foreground">
+        查询任务来自批量 RDAP 工具。可以在
+        <Link to="/tools/batch-rdap" className="text-primary hover:underline">
+          /tools/batch-rdap
+        </Link>{" "}
+        创建任务。
+      </p>
       {isLoading ? (
         <div className="card-elev overflow-hidden">
-          <table className="w-full text-sm"><tbody><TableSkeleton rows={5} cols={6} /></tbody></table>
+          <table className="w-full text-sm">
+            <tbody>
+              <TableSkeleton rows={5} cols={6} />
+            </tbody>
+          </table>
         </div>
       ) : !data?.length ? (
-        <EmptyState title="暂无任务" hint="到批量 RDAP 工具创建查询任务。" action={<Link to="/tools/batch-rdap" className="btn-base btn-primary">前往</Link>} />
+        <EmptyState
+          title="暂无任务"
+          hint="到批量 RDAP 工具创建查询任务。"
+          action={
+            <Link to="/tools/batch-rdap" className="btn-base btn-primary">
+              前往
+            </Link>
+          }
+        />
       ) : (
         <div className="card-elev overflow-hidden">
           <div className="overflow-x-auto">
@@ -45,11 +63,21 @@ function AdminJobs() {
                 {data.map((j: any) => (
                   <tr key={j.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-2 font-medium">{j.name}</td>
-                    <td className="px-3 py-2"><span className="chip">{j.status}</span></td>
-                    <td className="px-3 py-2 text-right tabular-nums">{j.checked}/{j.total}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-success">{j.available}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-destructive">{j.errors}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(j.created_at).toLocaleString()}</td>
+                    <td className="px-3 py-2">
+                      <span className="chip">{j.status}</span>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {j.checked}/{j.total}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-success">
+                      {j.available}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-destructive">
+                      {j.errors}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {new Date(j.created_at).toLocaleString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
